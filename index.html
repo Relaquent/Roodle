@@ -1,0 +1,2131 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Roodle – Türkiye'nin Kelime Oyunu</title>
+<link href="https://fonts.googleapis.com/css2?family=Clash+Display:wght@400;500;600;700;800&family=Space+Grotesk:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #08080d;
+    --surface: #11111a;
+    --surface2: #1a1a28;
+    --surface3: #232336;
+    --border: #2d2d44;
+    --accent: #00ffb3;
+    --accent2: #00e1ff;
+    --accent3: #ff0095;
+    --accent4: #ffd600;
+    --text: #f8f8ff;
+    --text-muted: #9999bb;
+    --correct: #00ffb3;
+    --present: #ffd600;
+    --absent: #404060;
+    --correct-bg: #002a1f;
+    --present-bg: #3d3400;
+    --absent-bg: #1a1a24;
+    --tile-size: 68px;
+    --tile-gap: 10px;
+    --font-display: 'Clash Display', sans-serif;
+    --font-body: 'Space Grotesk', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+    --radius: 14px;
+    --shadow-sm: 0 2px 12px rgba(0,0,0,0.4);
+    --shadow-md: 0 6px 24px rgba(0,0,0,0.5);
+    --shadow-lg: 0 12px 48px rgba(0,0,0,0.6);
+    --glow: 0 0 30px rgba(0,255,179,0.4);
+    --glow-strong: 0 0 50px rgba(0,255,179,0.6);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: var(--font-body);
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  /* Enhanced animated background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: 
+      radial-gradient(ellipse at top left, rgba(0,255,179,0.05) 0%, transparent 40%),
+      radial-gradient(ellipse at bottom right, rgba(0,225,255,0.04) 0%, transparent 40%),
+      radial-gradient(ellipse at center, rgba(255,0,149,0.02) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 0;
+    animation: bgPulse 15s ease-in-out infinite;
+  }
+
+  @keyframes bgPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+  }
+
+  /* Premium mesh gradient backdrop */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,255,179,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,255,179,0.03) 1px, transparent 1px);
+    background-size: 70px 70px;
+    pointer-events: none;
+    z-index: 0;
+    animation: meshMove 40s linear infinite;
+  }
+
+  @keyframes meshMove {
+    from { background-position: 0 0; }
+    to { background-position: 70px 70px; }
+  }
+
+  /* HEADER */
+  header {
+    position: relative;
+    z-index: 10;
+    width: 100%;
+    max-width: 680px;
+    padding: 32px 40px 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .logo {
+    font-family: var(--font-display);
+    font-size: 42px;
+    font-weight: 800;
+    letter-spacing: -2px;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 50%, var(--accent3) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+    animation: logoGlow 4s ease-in-out infinite;
+    text-shadow: 0 0 40px rgba(0,255,179,0.3);
+  }
+
+  @keyframes logoGlow {
+    0%, 100% { filter: drop-shadow(0 0 12px rgba(0,255,179,0.4)); }
+    50% { filter: drop-shadow(0 0 24px rgba(0,255,179,0.7)); }
+  }
+
+  .header-controls {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+  }
+
+  .icon-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    color: var(--text-muted);
+    cursor: pointer;
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    transition: all 0.4s cubic-bezier(0.34,1.56,0.64,1);
+    box-shadow: var(--shadow-sm);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .icon-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+    opacity: 0;
+    transition: opacity 0.4s;
+  }
+
+  .icon-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    transform: translateY(-3px) scale(1.08);
+    box-shadow: var(--glow);
+  }
+
+  .icon-btn:hover::before {
+    opacity: 0.1;
+  }
+
+  .icon-btn:active {
+    transform: translateY(0) scale(0.95);
+  }
+
+  /* MODE SELECTOR */
+  .mode-selector {
+    position: relative;
+    z-index: 10;
+    width: 100%;
+    max-width: 680px;
+    padding: 24px 40px 0;
+  }
+
+  .mode-tabs {
+    display: flex;
+    gap: 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 8px;
+    box-shadow: var(--shadow-md);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .mode-tabs::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(0,255,179,0.05) 0%, rgba(0,225,255,0.03) 100%);
+    pointer-events: none;
+  }
+
+  .mode-tab {
+    flex: 1;
+    background: transparent;
+    border: none;
+    border-radius: 12px;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 12px 18px;
+    font-family: var(--font-body);
+    font-size: 14px;
+    font-weight: 700;
+    transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    position: relative;
+    z-index: 1;
+  }
+
+  .mode-tab:hover {
+    color: var(--text);
+    background: var(--surface2);
+    transform: translateY(-2px);
+  }
+
+  .mode-tab.active {
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+    color: var(--bg);
+    box-shadow: var(--glow), inset 0 1px 0 rgba(255,255,255,0.2);
+    transform: translateY(-2px);
+  }
+
+  .mode-tab .badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: linear-gradient(135deg, var(--accent3) 0%, #ff4db8 100%);
+    color: white;
+    font-size: 9px;
+    font-weight: 800;
+    padding: 3px 7px;
+    border-radius: 8px;
+    text-transform: uppercase;
+    box-shadow: 0 4px 12px rgba(255,0,149,0.4);
+    animation: badgePulse 2s ease-in-out infinite;
+  }
+
+  @keyframes badgePulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.1); }
+  }
+
+  /* WORD LENGTH */
+  .word-length-bar {
+    position: relative;
+    z-index: 10;
+    width: 100%;
+    max-width: 680px;
+    padding: 20px 40px 0;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+  }
+
+  .wl-label {
+    font-size: 12px;
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    margin-right: 10px;
+    font-weight: 600;
+  }
+
+  .wl-btn {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 10px 20px;
+    font-family: var(--font-mono);
+    font-size: 15px;
+    font-weight: 700;
+    transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    letter-spacing: 0.05em;
+    box-shadow: var(--shadow-sm);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .wl-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .wl-btn:hover { 
+    border-color: var(--accent); 
+    color: var(--accent);
+    transform: translateY(-2px) scale(1.05);
+  }
+
+  .wl-btn:hover::before {
+    opacity: 0.1;
+  }
+
+  .wl-btn.active {
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+    border-color: transparent;
+    color: var(--bg);
+    font-weight: 800;
+    box-shadow: var(--glow), inset 0 1px 0 rgba(255,255,255,0.2);
+    transform: translateY(-2px);
+  }
+
+  /* STATS BAR */
+  .stats-bar {
+    position: relative;
+    z-index: 10;
+    width: 100%;
+    max-width: 680px;
+    padding: 20px 40px 0;
+    display: flex;
+    gap: 14px;
+    align-items: center;
+  }
+
+  .stat-chip {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+    box-shadow: var(--shadow-sm);
+    transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .stat-chip::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .stat-chip:hover {
+    transform: translateY(-3px);
+    border-color: var(--accent);
+    box-shadow: var(--glow);
+  }
+
+  .stat-chip:hover::before {
+    opacity: 0.05;
+  }
+
+  .stat-chip .val {
+    color: var(--accent);
+    font-weight: 800;
+    font-size: 15px;
+  }
+
+  /* GAME AREA */
+  .game-area {
+    position: relative;
+    z-index: 10;
+    width: 100%;
+    max-width: 680px;
+    padding: 28px 40px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+    flex: 1;
+  }
+
+  /* CHALLENGE INFO */
+  .challenge-info {
+    background: linear-gradient(135deg, var(--surface2) 0%, var(--surface3) 100%);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px 24px;
+    text-align: center;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+    box-shadow: var(--shadow-sm);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .challenge-info::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(255,0,149,0.1) 0%, rgba(0,255,179,0.05) 100%);
+  }
+
+  .challenge-info strong {
+    color: var(--accent);
+    font-weight: 800;
+  }
+
+  /* TOAST */
+  .toast-container {
+    position: fixed;
+    top: 120px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 999;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    pointer-events: none;
+  }
+
+  .toast {
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+    color: var(--bg);
+    padding: 16px 32px;
+    border-radius: 16px;
+    font-family: var(--font-body);
+    font-size: 15px;
+    font-weight: 800;
+    text-align: center;
+    animation: toastIn 0.5s cubic-bezier(0.34,1.56,0.64,1), toastOut 0.4s ease 2.5s forwards;
+    white-space: nowrap;
+    box-shadow: var(--glow-strong), inset 0 1px 0 rgba(255,255,255,0.3);
+    letter-spacing: 0.3px;
+  }
+
+  @keyframes toastIn {
+    from { opacity: 0; transform: translateY(-30px) scale(0.7); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  @keyframes toastOut {
+    from { opacity: 1; transform: scale(1); }
+    to { opacity: 0; transform: scale(0.7); }
+  }
+
+  /* GRID */
+  .grid {
+    display: flex;
+    flex-direction: column;
+    gap: var(--tile-gap);
+  }
+
+  .grid-row {
+    display: flex;
+    gap: var(--tile-gap);
+  }
+
+  .tile {
+    width: var(--tile-size);
+    height: var(--tile-size);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-display);
+    font-size: 32px;
+    font-weight: 800;
+    color: var(--text);
+    background: var(--surface);
+    position: relative;
+    transition: all 0.3s;
+    user-select: none;
+    letter-spacing: -1px;
+    box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255,255,255,0.05);
+  }
+
+  .tile.filled {
+    border-color: var(--accent);
+    background: var(--surface2);
+    animation: tilePop 0.2s cubic-bezier(0.34,1.56,0.64,1);
+    box-shadow: var(--shadow-md), 0 0 20px rgba(0,255,179,0.2);
+  }
+
+  @keyframes tilePop {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.2); }
+    100% { transform: scale(1); }
+  }
+
+  .tile.reveal {
+    animation: tileFlip 0.7s cubic-bezier(0.34,1.56,0.64,1) forwards;
+  }
+
+  @keyframes tileFlip {
+    0% { transform: rotateY(0); }
+    50% { transform: rotateY(-90deg); background: var(--surface); }
+    100% { transform: rotateY(0); }
+  }
+
+  .tile.correct {
+    background: var(--correct-bg);
+    border-color: var(--correct);
+    color: var(--correct);
+    box-shadow: 0 0 32px rgba(0,255,179,0.5), inset 0 0 30px rgba(0,255,179,0.15), inset 0 1px 0 rgba(255,255,255,0.2);
+    font-weight: 900;
+  }
+
+  .tile.present {
+    background: var(--present-bg);
+    border-color: var(--present);
+    color: var(--present);
+    box-shadow: 0 0 32px rgba(255,214,0,0.4), inset 0 0 30px rgba(255,214,0,0.15), inset 0 1px 0 rgba(255,255,255,0.2);
+    font-weight: 900;
+  }
+
+  .tile.absent {
+    background: var(--absent-bg);
+    border-color: var(--absent);
+    color: var(--text-muted);
+    box-shadow: var(--shadow-sm);
+  }
+
+  .tile.shake {
+    animation: shake 0.6s cubic-bezier(0.36,0.07,0.19,0.97);
+  }
+
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    10%, 50%, 90% { transform: translateX(-12px); }
+    30%, 70% { transform: translateX(12px); }
+  }
+
+  .tile.bounce {
+    animation: bounce 1s cubic-bezier(0.34,1.56,0.64,1);
+  }
+
+  @keyframes bounce {
+    0%, 100% { transform: translateY(0) scale(1); }
+    30% { transform: translateY(-32px) scale(1.12); }
+    60% { transform: translateY(-12px); }
+    80% { transform: translateY(-4px); }
+  }
+
+  /* KEYBOARD */
+  .keyboard {
+    width: 100%;
+    max-width: 600px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding-bottom: 28px;
+  }
+
+  .key-row {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+  }
+
+  .key {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    color: var(--text);
+    cursor: pointer;
+    height: 60px;
+    min-width: 40px;
+    flex: 1;
+    max-width: 50px;
+    font-family: var(--font-display);
+    font-size: 16px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s cubic-bezier(0.34,1.56,0.64,1);
+    touch-action: manipulation;
+    user-select: none;
+    letter-spacing: -0.5px;
+    box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255,255,255,0.05);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .key::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .key:hover:not(.disabled) {
+    background: var(--surface3);
+    border-color: var(--accent);
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: var(--shadow-md), 0 0 20px rgba(0,255,179,0.3);
+  }
+
+  .key:hover:not(.disabled)::before {
+    opacity: 0.1;
+  }
+
+  .key:active:not(.disabled) {
+    transform: translateY(0px) scale(0.95);
+  }
+
+  .key.wide {
+    min-width: 70px;
+    max-width: 90px;
+    font-size: 14px;
+    letter-spacing: 0;
+  }
+
+  .key.correct {
+    background: var(--correct-bg);
+    border-color: var(--correct);
+    color: var(--correct);
+    box-shadow: 0 0 20px rgba(0,255,179,0.3), inset 0 0 20px rgba(0,255,179,0.1);
+  }
+
+  .key.present {
+    background: var(--present-bg);
+    border-color: var(--present);
+    color: var(--present);
+    box-shadow: 0 0 20px rgba(255,214,0,0.3), inset 0 0 20px rgba(255,214,0,0.1);
+  }
+
+  .key.absent {
+    background: var(--absent-bg);
+    border-color: var(--absent);
+    color: var(--text-muted);
+  }
+
+  .key.enter-key {
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+    border-color: transparent;
+    color: var(--bg);
+    font-weight: 900;
+    box-shadow: var(--glow-strong), inset 0 1px 0 rgba(255,255,255,0.3);
+  }
+
+  .key.enter-key:hover { 
+    transform: translateY(-3px) scale(1.08);
+    box-shadow: 0 0 40px rgba(0,255,179,0.6), inset 0 1px 0 rgba(255,255,255,0.3);
+  }
+
+  /* MODAL */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.92);
+    backdrop-filter: blur(16px);
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 28px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.4s;
+  }
+
+  .modal-overlay.show {
+    opacity: 1;
+    pointer-events: all;
+  }
+
+  .modal {
+    background: linear-gradient(135deg, var(--surface) 0%, var(--surface2) 100%);
+    border: 1px solid var(--border);
+    border-radius: 28px;
+    padding: 48px;
+    max-width: 480px;
+    width: 100%;
+    box-shadow: var(--shadow-lg), 0 0 0 1px rgba(0,255,179,0.15), 0 0 80px rgba(0,255,179,0.2);
+    transform: translateY(40px) scale(0.9);
+    transition: transform 0.5s cubic-bezier(0.34,1.56,0.64,1);
+    position: relative;
+  }
+
+  .modal-overlay.show .modal {
+    transform: translateY(0) scale(1);
+  }
+
+  .modal h2 {
+    font-family: var(--font-display);
+    font-size: 32px;
+    font-weight: 900;
+    margin-bottom: 12px;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 50%, var(--accent3) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: -1px;
+  }
+
+  .modal p {
+    color: var(--text-muted);
+    font-size: 15px;
+    line-height: 1.7;
+    margin-bottom: 24px;
+    font-weight: 400;
+  }
+
+  .modal-close {
+    position: absolute;
+    top: 24px;
+    right: 24px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text-muted);
+    width: 36px;
+    height: 36px;
+    cursor: pointer;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    font-weight: 700;
+  }
+
+  .modal-close:hover { 
+    border-color: var(--accent); 
+    color: var(--accent);
+    transform: rotate(90deg) scale(1.1);
+    box-shadow: 0 0 20px rgba(0,255,179,0.3);
+  }
+
+  .answer-reveal {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 24px;
+    margin: 24px 0;
+    text-align: center;
+    box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255,255,255,0.05);
+  }
+
+  .answer-label {
+    font-size: 11px;
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.25em;
+    margin-bottom: 16px;
+    font-weight: 700;
+  }
+
+  .answer-word {
+    font-family: var(--font-display);
+    font-size: 38px;
+    font-weight: 900;
+    color: var(--correct);
+    letter-spacing: 8px;
+    text-shadow: 0 0 32px rgba(0,255,179,0.6);
+  }
+
+  .modal-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+    margin: 24px 0;
+  }
+
+  .modal-stat {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px 12px;
+    text-align: center;
+    transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255,255,255,0.05);
+  }
+
+  .modal-stat:hover {
+    transform: translateY(-4px) scale(1.05);
+    border-color: var(--accent);
+    box-shadow: var(--shadow-md), 0 0 24px rgba(0,255,179,0.3);
+  }
+
+  .modal-stat .ms-val {
+    font-family: var(--font-display);
+    font-size: 32px;
+    font-weight: 900;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .modal-stat .ms-label {
+    font-size: 10px;
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    margin-top: 6px;
+    font-weight: 600;
+  }
+
+  .btn-row {
+    display: flex;
+    gap: 14px;
+    margin-top: 28px;
+  }
+
+  .btn {
+    flex: 1;
+    padding: 16px 24px;
+    border-radius: 14px;
+    border: none;
+    cursor: pointer;
+    font-family: var(--font-body);
+    font-size: 15px;
+    font-weight: 800;
+    transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    box-shadow: var(--shadow-sm);
+    letter-spacing: 0.3px;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+    color: var(--bg);
+    box-shadow: var(--glow), inset 0 1px 0 rgba(255,255,255,0.3);
+  }
+
+  .btn-primary:hover { 
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 0 0 40px rgba(0,255,179,0.6), inset 0 1px 0 rgba(255,255,255,0.3);
+  }
+
+  .btn-secondary {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255,255,255,0.05);
+  }
+
+  .btn-secondary:hover { 
+    border-color: var(--accent);
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-md), 0 0 20px rgba(0,255,179,0.2);
+  }
+
+  /* Examples */
+  .example-row {
+    display: flex;
+    gap: 10px;
+    margin: 14px 0;
+    align-items: center;
+  }
+
+  .ex-tile {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-display);
+    font-weight: 900;
+    font-size: 22px;
+    border: 2px solid var(--border);
+    background: var(--surface2);
+    color: var(--text);
+    flex-shrink: 0;
+    box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255,255,255,0.05);
+  }
+
+  .ex-tile.c { background: var(--correct-bg); border-color: var(--correct); color: var(--correct); box-shadow: 0 0 16px rgba(0,255,179,0.3); }
+  .ex-tile.p { background: var(--present-bg); border-color: var(--present); color: var(--present); box-shadow: 0 0 16px rgba(255,214,0,0.3); }
+  .ex-tile.a { background: var(--absent-bg); border-color: var(--absent); color: var(--text-muted); }
+
+  .ex-label {
+    font-size: 14px;
+    color: var(--text-muted);
+    line-height: 1.6;
+    margin-left: 8px;
+  }
+
+  .divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border), transparent);
+    margin: 28px 0;
+  }
+
+  /* Distribution */
+  .dist-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 6px 0;
+    font-size: 14px;
+    font-family: var(--font-mono);
+  }
+
+  .dist-num { color: var(--text-muted); min-width: 20px; font-weight: 700; }
+
+  .dist-bar-wrap { 
+    flex: 1; 
+    background: var(--surface2); 
+    border-radius: 8px; 
+    height: 28px; 
+    overflow: hidden;
+    border: 1px solid var(--border);
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.3);
+  }
+
+  .dist-bar {
+    height: 100%;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+    border-radius: 8px;
+    min-width: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    padding-right: 10px;
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--bg);
+    transition: width 1s cubic-bezier(0.34,1.56,0.64,1);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.3);
+  }
+
+  .dist-bar.current { 
+    background: linear-gradient(135deg, var(--correct) 0%, var(--accent2) 100%);
+    box-shadow: var(--glow), inset 0 1px 0 rgba(255,255,255,0.3);
+  }
+
+  /* Confetti */
+  #confetti-canvas {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 50;
+  }
+
+  /* Next timer */
+  .next-word-timer {
+    font-family: var(--font-mono);
+    font-size: 32px;
+    font-weight: 900;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-align: center;
+    letter-spacing: 4px;
+  }
+
+  .next-word-label {
+    font-size: 12px;
+    font-family: var(--font-mono);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    text-align: center;
+    margin-bottom: 12px;
+    font-weight: 700;
+  }
+
+  /* Power-ups panel */
+  .powerups-panel {
+    background: linear-gradient(135deg, var(--surface2) 0%, var(--surface3) 100%);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 14px;
+    display: flex;
+    gap: 12px;
+    box-shadow: var(--shadow-md);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .powerups-panel::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(0,255,179,0.05) 0%, rgba(0,225,255,0.03) 100%);
+  }
+
+  .powerup-btn {
+    background: var(--surface3);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    color: var(--text);
+    cursor: pointer;
+    padding: 12px 18px;
+    font-size: 14px;
+    font-weight: 700;
+    font-family: var(--font-body);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255,255,255,0.05);
+    position: relative;
+    z-index: 1;
+  }
+
+  .powerup-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+    opacity: 0;
+    transition: opacity 0.3s;
+    border-radius: 12px;
+  }
+
+  .powerup-btn:hover:not(.used) {
+    border-color: var(--accent);
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: var(--shadow-md), 0 0 24px rgba(0,255,179,0.3);
+  }
+
+  .powerup-btn:hover:not(.used)::before {
+    opacity: 0.1;
+  }
+
+  .powerup-btn.used {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+
+  .powerup-icon {
+    font-size: 18px;
+  }
+
+  /* Streak fire */
+  .streak-fire {
+    display: inline-block;
+    animation: fireFlicker 1.5s infinite alternate;
+  }
+
+  @keyframes fireFlicker {
+    from { transform: scale(1) rotate(-5deg); }
+    to { transform: scale(1.2) rotate(7deg); }
+  }
+
+  /* Footer */
+  .footer {
+    position: relative;
+    z-index: 10;
+    width: 100%;
+    text-align: center;
+    padding: 32px;
+    color: var(--text-muted);
+    font-size: 13px;
+    font-family: var(--font-mono);
+    border-top: 1px solid var(--border);
+    margin-top: auto;
+  }
+
+  .footer a {
+    color: var(--accent);
+    text-decoration: none;
+    transition: color 0.3s;
+    font-weight: 700;
+  }
+
+  .footer a:hover {
+    color: var(--accent2);
+  }
+
+  /* Responsive */
+  @media (max-width: 480px) {
+    :root {
+      --tile-size: 56px;
+      --tile-gap: 7px;
+    }
+    header { padding: 24px 24px 0; }
+    .logo { font-size: 34px; }
+    .mode-selector, .word-length-bar, .stats-bar, .game-area { padding-left: 24px; padding-right: 24px; }
+    .tile { font-size: 24px; }
+    .key { height: 52px; font-size: 14px; }
+    .key.wide { min-width: 56px; max-width: 70px; }
+    .modal { padding: 36px 28px; }
+    .powerups-panel { flex-direction: column; }
+  }
+
+  @media (max-width: 380px) {
+    :root {
+      --tile-size: 48px;
+      --tile-gap: 5px;
+    }
+    .tile { font-size: 20px; }
+    .key { height: 48px; min-width: 34px; font-size: 13px; }
+    .key.wide { min-width: 52px; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="confetti-canvas"></canvas>
+<div class="toast-container" id="toast-container"></div>
+
+<!-- HEADER -->
+<header>
+  <div class="logo" id="logo">ROODLE</div>
+  <div class="header-controls">
+    <button class="icon-btn" id="stats-btn" title="İstatistikler">📊</button>
+    <button class="icon-btn" id="help-btn" title="Nasıl oynanır?">❓</button>
+    <button class="icon-btn" id="settings-btn" title="Ayarlar">⚙️</button>
+  </div>
+</header>
+
+<!-- MODE SELECTOR -->
+<div class="mode-selector">
+  <div class="mode-tabs">
+    <button class="mode-tab active" data-mode="daily">📅 Günlük</button>
+    <button class="mode-tab" data-mode="unlimited">♾️ Sınırsız</button>
+    <button class="mode-tab" data-mode="challenge">⚡ Meydan Okuma<span class="badge">Yeni</span></button>
+    <button class="mode-tab" data-mode="zen">🧘 Zen</button>
+  </div>
+</div>
+
+<!-- WORD LENGTH -->
+<div class="word-length-bar">
+  <span class="wl-label">Harf:</span>
+  <button class="wl-btn active" data-len="5">5</button>
+  <button class="wl-btn" data-len="4">4</button>
+  <button class="wl-btn" data-len="6">6</button>
+  <button class="wl-btn" data-len="7">7</button>
+</div>
+
+<!-- STATS BAR -->
+<div class="stats-bar" id="stats-bar">
+  <div class="stat-chip">🔥 <span class="val" id="streak-val">0</span></div>
+  <div class="stat-chip">✅ <span class="val" id="win-val">0</span></div>
+  <div class="stat-chip">🎯 <span class="val" id="rate-val">0</span>%</div>
+  <div class="stat-chip">⏱️ <span class="val" id="avg-val">--</span>s</div>
+</div>
+
+<!-- GAME AREA -->
+<div class="game-area">
+  <!-- Challenge info -->
+  <div class="challenge-info" id="challenge-info" style="display:none;"></div>
+  
+  <!-- Power-ups -->
+  <div class="powerups-panel" id="powerups-panel" style="display:none;">
+    <button class="powerup-btn" id="hint-btn" title="Kelimede bulunan bir harfi gösterir">
+      <span class="powerup-icon">💡</span> İpucu
+    </button>
+    <button class="powerup-btn" id="eliminate-btn" title="Yanlış harfleri siler">
+      <span class="powerup-icon">🗑️</span> Temizle
+    </button>
+    <button class="powerup-btn" id="skip-btn" title="Bu kelimeyi atla">
+      <span class="powerup-icon">⏭️</span> Atla
+    </button>
+  </div>
+
+  <div class="grid" id="grid"></div>
+  <div class="keyboard" id="keyboard"></div>
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  Made with 💚 by <a href="#" target="_blank">Relaquent</a>
+</div>
+
+<!-- HOW TO PLAY MODAL -->
+<div class="modal-overlay" id="help-modal">
+  <div class="modal">
+    <button class="modal-close" id="help-close">✕</button>
+    <h2>Nasıl Oynanır?</h2>
+    <p>Gizli kelimeyi <strong>6 tahmin</strong> hakkında bulun.</p>
+    <div class="divider"></div>
+
+    <p style="font-size:13px; margin-bottom:14px; font-weight:700;"><strong>Örnekler:</strong></p>
+
+    <div class="example-row">
+      <div class="ex-tile c">K</div>
+      <div class="ex-tile">A</div>
+      <div class="ex-tile">L</div>
+      <div class="ex-tile">E</div>
+      <div class="ex-tile">M</div>
+      <div class="ex-label"><strong style="color:var(--correct)">K</strong> harfi doğru yerde ✓</div>
+    </div>
+
+    <div class="example-row">
+      <div class="ex-tile">S</div>
+      <div class="ex-tile p">A</div>
+      <div class="ex-tile">H</div>
+      <div class="ex-tile">İ</div>
+      <div class="ex-tile">L</div>
+      <div class="ex-label"><strong style="color:var(--present)">A</strong> harfi var ama yanlış yerde</div>
+    </div>
+
+    <div class="example-row">
+      <div class="ex-tile">Y</div>
+      <div class="ex-tile">A</div>
+      <div class="ex-tile a">Z</div>
+      <div class="ex-tile">I</div>
+      <div class="ex-tile">N</div>
+      <div class="ex-label"><strong style="color:var(--text-muted)">Z</strong> harfi kelimede yok ✗</div>
+    </div>
+
+    <div class="divider"></div>
+    
+    <p style="font-size:13px; margin-bottom:18px; font-weight:700;"><strong>Oyun Modları:</strong></p>
+    <p style="font-size:13px; line-height:1.7; margin-bottom:10px;">
+      <strong>📅 Günlük:</strong> Her gün yeni bir kelime<br>
+      <strong>♾️ Sınırsız:</strong> Sınırsız pratik yap + Güç destekleri<br>
+      <strong>⚡ Meydan Okuma:</strong> Sadece 4 tahmin hakkı<br>
+      <strong>🧘 Zen:</strong> Zaman sınırı yok + Güç destekleri
+    </p>
+
+    <div class="divider"></div>
+    <p style="font-size:12px; color:var(--text-muted);">Türkçe karakterler (İ, Ş, Ğ, Ü, Ö, Ç) desteklenmektedir.</p>
+
+    <div class="btn-row">
+      <button class="btn btn-primary" id="help-close-btn">Başlayalım! 🎮</button>
+    </div>
+  </div>
+</div>
+
+<!-- STATS MODAL -->
+<div class="modal-overlay" id="stats-modal">
+  <div class="modal">
+    <button class="modal-close" id="stats-close">✕</button>
+    <h2>📊 İstatistikler</h2>
+
+    <div class="modal-stats" id="stats-grid"></div>
+
+    <div class="divider"></div>
+    <p style="font-size:11px; color:var(--text-muted); margin-bottom:14px; font-family:var(--font-mono); letter-spacing:0.15em; font-weight:700;">TAHMİN DAĞILIMI</p>
+    <div id="dist-chart"></div>
+
+    <div class="btn-row">
+      <button class="btn btn-secondary" id="stats-close-btn">Kapat</button>
+      <button class="btn btn-primary" id="stats-reset-btn">Sıfırla</button>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS MODAL -->
+<div class="modal-overlay" id="settings-modal">
+  <div class="modal">
+    <button class="modal-close" id="settings-close">✕</button>
+    <h2>⚙️ Ayarlar</h2>
+
+    <div style="margin: 24px 0;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin:20px 0;">
+        <span style="font-size:15px; font-weight:600;">Koyu Mod</span>
+        <label style="position:relative; display:inline-block; width:56px; height:30px;">
+          <input type="checkbox" id="dark-mode-toggle" checked style="opacity:0; width:0; height:0;">
+          <span style="position:absolute; cursor:pointer; inset:0; background:var(--surface2); border-radius:30px; transition:0.3s; border:1px solid var(--border);"></span>
+          <span style="position:absolute; content:''; height:22px; width:22px; left:4px; bottom:3px; background:white; border-radius:50%; transition:0.3s;"></span>
+        </label>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; margin:20px 0;">
+        <span style="font-size:15px; font-weight:600;">Ses Efektleri</span>
+        <label style="position:relative; display:inline-block; width:56px; height:30px;">
+          <input type="checkbox" id="sound-toggle" checked style="opacity:0; width:0; height:0;">
+          <span style="position:absolute; cursor:pointer; inset:0; background:var(--surface2); border-radius:30px; transition:0.3s; border:1px solid var(--border);"></span>
+          <span style="position:absolute; content:''; height:22px; width:22px; left:4px; bottom:3px; background:white; border-radius:50%; transition:0.3s;"></span>
+        </label>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; margin:20px 0;">
+        <span style="font-size:15px; font-weight:600;">Animasyonlar</span>
+        <label style="position:relative; display:inline-block; width:56px; height:30px;">
+          <input type="checkbox" id="animation-toggle" checked style="opacity:0; width:0; height:0;">
+          <span style="position:absolute; cursor:pointer; inset:0; background:var(--surface2); border-radius:30px; transition:0.3s; border:1px solid var(--border);"></span>
+          <span style="position:absolute; content:''; height:22px; width:22px; left:4px; bottom:3px; background:white; border-radius:50%; transition:0.3s;"></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-secondary" id="settings-close-btn">Kapat</button>
+    </div>
+  </div>
+</div>
+
+<!-- RESULT MODAL -->
+<div class="modal-overlay" id="result-modal">
+  <div class="modal">
+    <h2 id="result-title">🎉</h2>
+    <p id="result-msg"></p>
+
+    <div class="answer-reveal" id="result-answer" style="display:none;">
+      <div class="answer-label">Cevap</div>
+      <div class="answer-word" id="result-word"></div>
+    </div>
+
+    <div class="modal-stats" id="result-stats"></div>
+
+    <div id="daily-timer-section" style="display:none;">
+      <div class="next-word-label">Sonraki Kelime</div>
+      <div class="next-word-timer" id="next-timer">--:--:--</div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-secondary" id="share-btn">🔗 Paylaş</button>
+      <button class="btn btn-primary" id="result-new-btn">Yeni Oyun 🎲</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== COMPREHENSIVE WORD LISTS =====
+const WORD_LISTS = {
+  4: [
+    "ARPA","BACA","DOLU","ELMA","FARE","GECE","HAVA","IŞIK","KALE","KAYA","KUYU","LALE","MASA","NANE","PARA","RÜYA","SAAT","TANE",
+    "BORU","DEVE","ERİK","FENER","GEMİ","HARÇ","İPEK","KALEM","LİMAN","MARUL","NEHİR","OCAK","PAKET","RESİM","SALON","TARLA","VATAN",
+    "ASLAN","BEBEK","CADDE","DUMAN","ENSE","FİDAN","GÜNEŞ","HAYAT","İNSAN","KANAT","LEVHA","MEŞE","OLTA","PETEK","RENK","TOPRAK","UZMAN","YENGE",
+    "AVUÇ","CEKET","EBRU","GÖRÜŞ","HAMAM","İNCİR","JETON","MERAK","NOTA","ORMAN","POSTA","RÜZGAR","SABUN","TAVAN","UMUT","YAZAR",
+    "AKŞAM","BÖLGE","DENİZ","GÖREV","HAZNE","İSKELE","EKMEK","BORSA","DİLEK","FİKİR","ALTIN","BAKAR","ÇORAP","DİKEY","ERDEM","FALCİ","HASTA","İŞÇİ",
+    "KARGA","LİMON","MATEM","NAMUS","ODUN","PAZAR","RAPOR","SIĞIR","TEMEL","URGAN","VERGİ","YAKIN","ZAMAN","AŞÇI","BALIK","CİLT","DURUM","GELİR",
+    "HABER","İSİM","KEMAN","LALE","MANAV","NİHAL","OYUN","PERDE","ROMAN","SOFRA","UFUK","VİTES","YOLCU","ALEV","BÖLÜM","ÇUKUR","DERGİ","ETKEN",
+    "FUTBOL","HESAP","İÇKİ","KURAL","LADEN","NİYET","ÖĞLE","PEYNİR","RUSYA","ŞEKER","TEKNE","VARLIK","YAPRAK","ZORLU","AVUKAT","CENNET","DÜNYA","EKİP","FORUM","GEZİ"
+  ],
+  5: [
+    "AKŞAM","BALON","CADDE","DALGA","ELMAS","FENER","GÜNEŞ","HAYAT","İNCİR","KALEM","LAMBA","MARUL","NEHİR","OCAĞI","PAKET","RESİM","SALON","TARLA","YATAK","ZEYTİN",
+    "ASKER","BEBEK","ÇİÇEK","DENİZ","EBEDİ","FARİZ","GELİN","HAZIR","İKLİM","JETON","KADIN","LEVHA","MEŞAK","NOKTA","ORMAN","POSTA","RÜZGAR","SEBZE","TAVAN","YAZAR",
+    "ALÇAK","BORSA","CEKET","DİLEK","EKMEK","FİKİR","GÖZLÜK","HAMAM","İNSAN","KANAT","LÜFER","MEVKİ","NAMAZ","OYNAK","PERUK","RAFET","SABAH","TARAF","UYKU","YETER",
+    "ALTIN","BAKAR","ÇORAP","DİKEY","ERDEM","FALCİ","GÖREV","HASTA","İŞÇİ","KARGA","LİMON","MATEM","NAMUS","ODUN","PAZAR","RAPOR","SIĞIR","TEMEL","URGAN","VERGİ",
+    "YAKIN","ZAMAN","AŞÇI","BALIK","CİLDİ","DURUM","ELMAN","FİDAN","GELİR","HABER","İSİM","KEMAN","LALE","MANAV","NİHAL","OYUNU","PERDE","ROMAN","SOFRA","UFUK",
+    "VİTES","YOLCU","ALEV","BÖLÜM","ÇUKUR","DERGİ","ETKEN","FUTBOL","GÖRÜŞ","HESAP","İÇKİ","KURAL","LADEN","MERAK","NİYET","ÖĞLE","PAYDAŞ","RUSYA","ŞEKER","TEKNE",
+    "UZMAN","VARLIK","YAPRAK","ZORLU","AVUKAT","BİRİKİM","CENNET","DÜNYA","EKİP","FORUM","GEZİ","ÖRNEK","ÇOCUK","DAĞLAR","SEFER","TOPRAK","UMUT","KÖPRÜ","YÜZME",
+    "KAHVE","PİRİNÇ","SOĞAN","DOĞRU","KÖTÜ","NİYET","SABAH","BİBER","SOĞAN","TABLO","HAYAL","KENDİ","ADRES","SİYAH","BEYAZ","SAVAŞ","BARIŞ","AĞAÇ","KUŞAK"
+  ],
+  6: [
+    "AKRABA","BALKON","CEVHER","DALYAN","ELEKTRİK","FENOMEN","GÜNEŞLİK","HAYVAN","İLERLEME","KARANLIK","LAMBACI","MAVZER","NESNEL","OTURAK","RESİMLİ","SABAHÇI","UÇURTMA","YAZLICI",
+    "ASİSTAN","BAVULLU","DOSTANE","ERDOĞAN","FIRINLI","GÜVERCİN","HASTANE","İNSANLI","KALEMLİ","LİMONLU","MANTIĞI","NÜKLEER","ÖRÜMCEK","PAKETLİ","RÜZGÂR","SERÜVEN","TELAŞLI","UMURSAR",
+    "VARLıKLı","YAZIŞMA","ZORLANMA","ARKADAŞ","BİÇİMLİ","ÇORAPLI","DUYGULU","EKMEKLİ","FİKİRLİ","GÖZLEMCİ","HABERCİ","İŞARET","KAYIKÇI","LİMANLI","MERAKLI","OKULDAN","PAZARCI",
+    "RESİMCİ","TUTUMLU","USTASIZ","VERİMLİ","YARATICI","ZORLUĞU","ANLAYIŞ","BEĞENİLİ","ÇÖZÜMLÜ","DENEYİM","ELEŞTİR","FELAKET","GÖRÜŞMEK","HEYECAN","İYİLİK","KAVGALI",
+    "LEZZETLİ","MÜKEMMEL","NEREDEYSE","ÖZGÜRLÜK","PAYLAŞIM","REHBERİ","ŞARKICI","TOPRAKLı","UMUTLAR","VARLıĞı","YARDIMCI","ZERAFET","ARAYIŞTA","BAŞARıLı","ÇEKİRGE",
+    "DÜŞÜNCE","EĞİTİMİ","FELSEFE","GELENEK","HASTASIZ","İNANÇLI","KARARLI","LİMONATA","MÜCADELE","NEZAKET","ÖĞRENCI","PROGRAM","TOPLUMSAL","UFUKLAR","VATANDAŞ","ZENGİN","YOKSUL","ÜCRET","ŞEHİR","KÖY"
+  ],
+  7: [
+    "ANLAMALI","BAŞARıLı","ÇEKİCİLİ","DENEYİMLİ","EĞİTİMLİ","FENOMENLİ","GELİŞİMLİ","HEYECANLı","İLERLEMEK","KAHRAMAN","LİDERLİK","MÜKEMMEL","NEZAKETLİ","ÖZGÜRLÜK","PAYLAŞMAK",
+    "REHBERLİK","ŞARKICıLıK","TOPLUMSAL","UMUTLANMA","VATANDAŞ","YAZARLıKTA","ZORLUĞuNU","ARKADAŞLı","BİLİNÇSİZ","ÇABALASIN","DÜŞÜNCELI","ESERLERiN","FELSEFEYİ","GELECEĞİ",
+    "HUZURSUZLıK","İNSANLıKTA","KALıCıLıK","LİDERLİĞİ","MÜCADELELİ","NİTELİKLER","ÖRNEKLEMELİ","PARLAKLıK","RUHSALLıK","SEVECENLİK","TARİHSEL","UFUKLARıM","VEREMLİLİ","YARATıCıLıK",
+    "ZERAFETİNE","ANLAYışSız","BAŞARıSıYLA","ÇEKİCİLİĞİ","DEĞİŞİMLİK","EĞİLİMLERİ","FİKİRLERİN","GELİŞMELER","HAYALLERİN","İLHAMLARINı","KALKıNMANıN","LİDERLEŞMEK",
+    "NÜFUZLANıM","ÖZGÜNLÜKLEr","PAYLAŞıMLAR","RUHSALLıĞı","TOPLANTI","ÇALIŞMA","GÜVENLİK","DESTEK","PROJE","ÖDÜL","MÜDÜR","BÖLÜM","BAŞKAN","İŞLEM"
+  ]
+};
+
+// ===== GAME STATE =====
+let gameMode = 'daily';
+let wordLength = 5;
+let targetWord = '';
+let currentRow = 0;
+let currentCol = 0;
+let currentGuess = [];
+let gameOver = false;
+let board = [];
+let keyStates = {};
+let powerupsUsed = { hint: false, eliminate: false, skip: false };
+let gameStartTime = null;
+let settings = {
+  darkMode: true,
+  sound: true,
+  animations: true
+};
+
+// ===== STATS =====
+function getStats(mode, len) {
+  const key = `roodle_stats_${mode}_${len}`;
+  const d = localStorage.getItem(key);
+  if (d) return JSON.parse(d);
+  return { played: 0, wins: 0, streak: 0, maxStreak: 0, distribution: [0,0,0,0,0,0], avgTime: 0, totalTime: 0 };
+}
+
+function saveStats(mode, len, stats) {
+  localStorage.setItem(`roodle_stats_${mode}_${len}`, JSON.stringify(stats));
+}
+
+function getGlobalStats() {
+  let played=0, wins=0, streak=0, maxStreak=0, totalTime=0, gamesWithTime=0;
+  ['daily','unlimited','challenge','zen'].forEach(mode => {
+    [4,5,6,7].forEach(l => {
+      const s = getStats(mode, l);
+      played += s.played;
+      wins += s.wins;
+      streak = Math.max(streak, s.streak);
+      maxStreak = Math.max(maxStreak, s.maxStreak);
+      if (s.totalTime > 0) {
+        totalTime += s.totalTime;
+        gamesWithTime += s.wins;
+      }
+    });
+  });
+  const avgTime = gamesWithTime > 0 ? Math.round(totalTime / gamesWithTime) : 0;
+  return { played, wins, streak, maxStreak, avgTime };
+}
+
+function updateStatsBar() {
+  const gs = getGlobalStats();
+  document.getElementById('streak-val').textContent = gs.streak;
+  document.getElementById('win-val').textContent = gs.wins;
+  document.getElementById('rate-val').textContent = gs.played ? Math.round(gs.wins/gs.played*100) : 0;
+  document.getElementById('avg-val').textContent = gs.avgTime || '--';
+}
+
+// ===== WORD SELECTION =====
+function getTodayWord(len) {
+  const saved = localStorage.getItem(`roodle_today_${len}`);
+  const today = new Date().toDateString();
+  if (saved) {
+    const d = JSON.parse(saved);
+    if (d.date === today) return d.word;
+  }
+  const list = WORD_LISTS[len];
+  const idx = dateHash(today, list.length);
+  const word = list[idx];
+  localStorage.setItem(`roodle_today_${len}`, JSON.stringify({ date: today, word }));
+  return word;
+}
+
+function dateHash(str, mod) {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) h = ((h << 5) - h + str.charCodeAt(i)) | 0;
+  return Math.abs(h) % mod;
+}
+
+function getRandomWord(len) {
+  const list = WORD_LISTS[len];
+  return list[Math.floor(Math.random() * list.length)];
+}
+
+// ===== BUILD GRID =====
+function buildGrid() {
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+  board = [];
+
+  const maxGuesses = gameMode === 'challenge' ? 4 : 6;
+  for (let r = 0; r < maxGuesses; r++) {
+    const row = document.createElement('div');
+    row.className = 'grid-row';
+    row.id = `row-${r}`;
+    const rowTiles = [];
+    for (let c = 0; c < wordLength; c++) {
+      const tile = document.createElement('div');
+      tile.className = 'tile';
+      tile.id = `tile-${r}-${c}`;
+      row.appendChild(tile);
+      rowTiles.push(tile);
+    }
+    grid.appendChild(row);
+    board.push(rowTiles);
+  }
+
+  if (wordLength >= 7) {
+    document.documentElement.style.setProperty('--tile-size', '56px');
+    document.documentElement.style.setProperty('--tile-gap', '7px');
+  } else if (wordLength === 6) {
+    document.documentElement.style.setProperty('--tile-size', '62px');
+    document.documentElement.style.setProperty('--tile-gap', '8px');
+  } else {
+    document.documentElement.style.setProperty('--tile-size', '68px');
+    document.documentElement.style.setProperty('--tile-gap', '10px');
+  }
+}
+
+// ===== BUILD KEYBOARD =====
+const KB_ROWS = [
+  ['E','R','T','Y','U','I','O','P','Ğ','Ü'],
+  ['A','S','D','F','G','H','J','K','L','Ş','İ'],
+  ['ENTER','Z','C','V','B','N','M','Ö','Ç','⌫']
+];
+
+function buildKeyboard() {
+  const kb = document.getElementById('keyboard');
+  kb.innerHTML = '';
+  keyStates = {};
+  KB_ROWS.forEach(row => {
+    const rowEl = document.createElement('div');
+    rowEl.className = 'key-row';
+    row.forEach(k => {
+      const btn = document.createElement('button');
+      btn.className = 'key' + (k === 'ENTER' ? ' wide enter-key' : k === '⌫' ? ' wide' : '');
+      btn.textContent = k;
+      btn.dataset.key = k;
+      btn.addEventListener('click', () => handleKey(k));
+      rowEl.appendChild(btn);
+      if (k !== 'ENTER' && k !== '⌫') keyStates[k] = 'none';
+    });
+    kb.appendChild(rowEl);
+  });
+}
+
+// ===== INPUT =====
+document.addEventListener('keydown', e => {
+  if (gameOver) return;
+  if (document.querySelector('.modal-overlay.show')) return;
+
+  const key = e.key.toUpperCase();
+  if (key === 'ENTER') handleKey('ENTER');
+  else if (key === 'BACKSPACE' || key === 'DELETE') handleKey('⌫');
+  else if (/^[A-ZÇĞİÖŞÜ]$/.test(key)) handleKey(key);
+});
+
+function handleKey(key) {
+  if (gameOver) return;
+  if (key === 'ENTER') {
+    submitGuess();
+  } else if (key === '⌫') {
+    deleteLetter();
+  } else if (currentCol < wordLength && /^[A-ZÇĞİÖŞÜ]$/.test(key)) {
+    addLetter(key);
+  }
+}
+
+function addLetter(letter) {
+  if (currentCol >= wordLength) return;
+  currentGuess[currentCol] = letter;
+  const tile = board[currentRow][currentCol];
+  tile.textContent = letter;
+  tile.classList.add('filled');
+  currentCol++;
+}
+
+function deleteLetter() {
+  if (currentCol <= 0) return;
+  currentCol--;
+  currentGuess[currentCol] = '';
+  const tile = board[currentRow][currentCol];
+  tile.textContent = '';
+  tile.classList.remove('filled');
+}
+
+// ===== SUBMIT =====
+function submitGuess() {
+  if (currentCol < wordLength) {
+    shakeRow(currentRow);
+    showToast('Kelime çok kısa!');
+    return;
+  }
+
+  const guess = currentGuess.join('');
+
+  if (!/^[A-ZÇĞİÖŞÜ]+$/.test(guess)) {
+    shakeRow(currentRow);
+    showToast('Geçersiz kelime!');
+    return;
+  }
+
+  revealRow(currentRow, guess, () => {
+    const won = guess === targetWord;
+    const maxGuesses = gameMode === 'challenge' ? 4 : 6;
+    const lastRow = currentRow === maxGuesses - 1;
+
+    if (won) {
+      gameOver = true;
+      const timeTaken = gameStartTime ? Math.round((Date.now() - gameStartTime) / 1000) : 0;
+      setTimeout(() => {
+        celebrateWin();
+        updateStats(true, currentRow + 1, timeTaken);
+        showResultModal(true, timeTaken);
+      }, wordLength * 200 + 500);
+    } else if (lastRow) {
+      gameOver = true;
+      setTimeout(() => {
+        updateStats(false, 0, 0);
+        showResultModal(false, 0);
+      }, wordLength * 200 + 500);
+    } else {
+      currentRow++;
+      currentCol = 0;
+      currentGuess = [];
+    }
+  });
+}
+
+// ===== REVEAL ROW =====
+function revealRow(row, guess, callback) {
+  const result = evaluateGuess(guess);
+
+  result.forEach((res, i) => {
+    const tile = board[row][i];
+    setTimeout(() => {
+      if (settings.animations) {
+        tile.classList.add('reveal');
+      }
+      setTimeout(() => {
+        tile.classList.add(res);
+        updateKeyState(guess[i], res);
+      }, settings.animations ? 300 : 0);
+    }, settings.animations ? i * 200 : 0);
+  });
+
+  setTimeout(callback, settings.animations ? wordLength * 200 + 500 : 100);
+}
+
+function evaluateGuess(guess) {
+  const result = Array(wordLength).fill('absent');
+  const target = targetWord.split('');
+  const guessArr = guess.split('');
+  const targetCount = {};
+
+  target.forEach(l => targetCount[l] = (targetCount[l] || 0) + 1);
+
+  for (let i = 0; i < wordLength; i++) {
+    if (guessArr[i] === target[i]) {
+      result[i] = 'correct';
+      targetCount[guessArr[i]]--;
+    }
+  }
+
+  for (let i = 0; i < wordLength; i++) {
+    if (result[i] === 'absent' && targetCount[guessArr[i]] > 0) {
+      result[i] = 'present';
+      targetCount[guessArr[i]]--;
+    }
+  }
+
+  return result;
+}
+
+function updateKeyState(letter, state) {
+  const priority = { correct: 3, present: 2, absent: 1, none: 0 };
+  const current = keyStates[letter] || 'none';
+  if ((priority[state] || 0) > (priority[current] || 0)) {
+    keyStates[letter] = state;
+    const keyEl = document.querySelector(`.key[data-key="${letter}"]`);
+    if (keyEl) {
+      keyEl.classList.remove('correct','present','absent');
+      if (state !== 'none') keyEl.classList.add(state);
+    }
+  }
+}
+
+// ===== SHAKE =====
+function shakeRow(row) {
+  board[row].forEach(tile => {
+    tile.classList.remove('shake');
+    void tile.offsetWidth;
+    tile.classList.add('shake');
+    setTimeout(() => tile.classList.remove('shake'), 600);
+  });
+}
+
+// ===== WIN CELEBRATION =====
+function celebrateWin() {
+  const rowMsgs = ['🤯 İNANILMAZ!','🔥 MÜKEMMEL!','⚡ HARİKA!','👏 ÇOK İYİ!','😊 GÜZEL!','👍 BAŞARDIN!'];
+  showToast(rowMsgs[currentRow] || 'TEBRİKLER!');
+
+  if (settings.animations) {
+    board[currentRow].forEach((tile, i) => {
+      setTimeout(() => {
+        tile.classList.add('bounce');
+      }, i * 100);
+    });
+  }
+
+  launchConfetti();
+}
+
+// ===== CONFETTI =====
+function launchConfetti() {
+  if (!settings.animations) return;
+
+  const canvas = document.getElementById('confetti-canvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+
+  const colors = ['#00ffb3','#00e1ff','#ff0095','#ffd600','#f97316','#a855f7'];
+  const particles = Array.from({length: 200}, () => ({
+    x: Math.random() * canvas.width,
+    y: -30,
+    vx: (Math.random() - 0.5) * 10,
+    vy: Math.random() * 6 + 3,
+    color: colors[Math.floor(Math.random() * colors.length)],
+    size: Math.random() * 12 + 6,
+    rotation: Math.random() * Math.PI * 2,
+    rotSpeed: (Math.random() - 0.5) * 0.3,
+    shape: Math.random() > 0.5 ? 'rect' : 'circle'
+  }));
+
+  let frame = 0;
+  function animate() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    particles.forEach(p => {
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.15;
+      p.rotation += p.rotSpeed;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rotation);
+      ctx.fillStyle = p.color;
+      ctx.globalAlpha = Math.max(0, 1 - p.y / canvas.height * 1.4);
+      if (p.shape === 'rect') {
+        ctx.fillRect(-p.size/2, -p.size/3, p.size, p.size*0.6);
+      } else {
+        ctx.beginPath();
+        ctx.arc(0, 0, p.size/2, 0, Math.PI*2);
+        ctx.fill();
+      }
+      ctx.restore();
+    });
+    frame++;
+    if (frame < 250) requestAnimationFrame(animate);
+    else ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+  animate();
+}
+
+// ===== TOAST =====
+function showToast(msg, duration = 2800) {
+  const c = document.getElementById('toast-container');
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  c.appendChild(t);
+  setTimeout(() => t.remove(), duration);
+}
+
+// ===== STATS =====
+function updateStats(won, guessCount, timeTaken) {
+  const stats = getStats(gameMode, wordLength);
+  stats.played++;
+  const today = new Date().toDateString();
+
+  if (won) {
+    stats.wins++;
+    stats.distribution[guessCount - 1]++;
+    stats.totalTime += timeTaken;
+    stats.avgTime = Math.round(stats.totalTime / stats.wins);
+
+    if (gameMode === 'daily') {
+      const yesterday = new Date(Date.now() - 86400000).toDateString();
+      if (stats.lastDate === yesterday || stats.lastDate === today) {
+        stats.streak++;
+      } else {
+        stats.streak = 1;
+      }
+      stats.maxStreak = Math.max(stats.maxStreak, stats.streak);
+      stats.lastDate = today;
+    }
+  } else {
+    if (gameMode === 'daily') {
+      stats.streak = 0;
+      stats.lastDate = today;
+    }
+  }
+
+  saveStats(gameMode, wordLength, stats);
+  updateStatsBar();
+}
+
+// ===== RESULT MODAL =====
+function showResultModal(won, timeTaken) {
+  const modal = document.getElementById('result-modal');
+  const title = document.getElementById('result-title');
+  const msg = document.getElementById('result-msg');
+  const answerDiv = document.getElementById('result-answer');
+  const answerWord = document.getElementById('result-word');
+  const statsEl = document.getElementById('result-stats');
+  const dailyTimerSection = document.getElementById('daily-timer-section');
+
+  if (won) {
+    const rowMsgs = ['🤯 İnanılmaz! 1 tahminde!','🔥 Mükemmel! 2 tahminde!','⚡ Harika! 3 tahminde!','👏 Çok iyi! 4 tahminde!','😊 Güzel! 5 tahminde!','👍 Başardın! 6 tahminde!'];
+    title.textContent = '🎉 Tebrikler!';
+    msg.textContent = rowMsgs[currentRow] || 'Tebrikler!';
+    if (timeTaken > 0) {
+      msg.textContent += ` (${timeTaken}s)`;
+    }
+    answerDiv.style.display = 'none';
+  } else {
+    title.textContent = '😔 Olmadı!';
+    msg.textContent = 'Bir dahaki sefere daha iyi olacaksın.';
+    answerDiv.style.display = 'block';
+    answerWord.textContent = targetWord;
+  }
+
+  const stats = getStats(gameMode, wordLength);
+  const winRate = stats.played ? Math.round(stats.wins/stats.played*100) : 0;
+  statsEl.innerHTML = `
+    <div class="modal-stat"><div class="ms-val">${stats.played}</div><div class="ms-label">Oyun</div></div>
+    <div class="modal-stat"><div class="ms-val">${stats.wins}</div><div class="ms-label">Kazanma</div></div>
+    <div class="modal-stat"><div class="ms-val">${stats.streak}${stats.streak > 2 ? '<span class="streak-fire">🔥</span>' : ''}</div><div class="ms-label">Seri</div></div>
+    <div class="modal-stat"><div class="ms-val">${winRate}%</div><div class="ms-label">Başarı</div></div>
+  `;
+
+  if (gameMode === 'daily') {
+    dailyTimerSection.style.display = 'block';
+    startNextWordTimer();
+  } else {
+    dailyTimerSection.style.display = 'none';
+  }
+
+  setTimeout(() => modal.classList.add('show'), 600);
+}
+
+// ===== NEXT WORD TIMER =====
+let nextTimerInterval = null;
+function startNextWordTimer() {
+  if (nextTimerInterval) clearInterval(nextTimerInterval);
+  
+  function update() {
+    const now = new Date();
+    const next = new Date();
+    next.setHours(24,0,0,0);
+    const diff = next - now;
+    const h = Math.floor(diff/3600000).toString().padStart(2,'0');
+    const m = Math.floor((diff%3600000)/60000).toString().padStart(2,'0');
+    const s = Math.floor((diff%60000)/1000).toString().padStart(2,'0');
+    const el = document.getElementById('next-timer');
+    if (el) el.textContent = `${h}:${m}:${s}`;
+  }
+  update();
+  nextTimerInterval = setInterval(update, 1000);
+}
+
+// ===== SHARE =====
+document.getElementById('share-btn').addEventListener('click', shareResult);
+
+function shareResult() {
+  const emojis = [];
+  const maxGuesses = gameMode === 'challenge' ? 4 : 6;
+
+  for (let r = 0; r < Math.min(currentRow + 1, maxGuesses); r++) {
+    const row = board[r].map(tile => {
+      if (tile.classList.contains('correct')) return '🟩';
+      if (tile.classList.contains('present')) return '🟨';
+      return '⬛';
+    }).join('');
+    emojis.push(row);
+  }
+
+  const won = gameOver && board[currentRow]?.[0]?.classList.contains('correct');
+  const guessLabel = won ? `${currentRow + 1}/${maxGuesses}` : `X/${maxGuesses}`;
+  
+  const modeEmoji = {
+    daily: '📅',
+    unlimited: '♾️',
+    challenge: '⚡',
+    zen: '🧘'
+  };
+
+  const text = `${modeEmoji[gameMode]} Roodle ${wordLength} Harf ${guessLabel}\n\n${emojis.join('\n')}\n\nroodle.app'da oyna!`;
+
+  if (navigator.share) {
+    navigator.share({ text }).catch(() => {});
+  } else {
+    navigator.clipboard.writeText(text).then(() => showToast('📋 Panoya kopyalandı!'));
+  }
+}
+
+// ===== STATS MODAL =====
+document.getElementById('stats-btn').addEventListener('click', () => {
+  renderStatsModal();
+  document.getElementById('stats-modal').classList.add('show');
+});
+
+function renderStatsModal() {
+  const stats = getStats(gameMode, wordLength);
+  const sg = document.getElementById('stats-grid');
+  const winRate = stats.played ? Math.round(stats.wins/stats.played*100) : 0;
+  sg.innerHTML = `
+    <div class="modal-stat"><div class="ms-val">${stats.played}</div><div class="ms-label">Oynanma</div></div>
+    <div class="modal-stat"><div class="ms-val">${winRate}%</div><div class="ms-label">Başarı</div></div>
+    <div class="modal-stat"><div class="ms-val">${stats.streak}</div><div class="ms-label">Seri 🔥</div></div>
+    <div class="modal-stat"><div class="ms-val">${stats.maxStreak}</div><div class="ms-label">En İyi</div></div>
+  `;
+
+  const dc = document.getElementById('dist-chart');
+  const maxVal = Math.max(...stats.distribution, 1);
+  const maxGuesses = gameMode === 'challenge' ? 4 : 6;
+  dc.innerHTML = stats.distribution.slice(0, maxGuesses).map((v, i) => `
+    <div class="dist-bar-row">
+      <span class="dist-num">${i+1}</span>
+      <div class="dist-bar-wrap">
+        <div class="dist-bar ${currentRow === i && gameOver ? 'current' : ''}" style="width:${Math.max(15, v/maxVal*100)}%">${v || ''}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ===== MODALS =====
+document.getElementById('help-btn').addEventListener('click', () => {
+  document.getElementById('help-modal').classList.add('show');
+});
+document.getElementById('help-close').addEventListener('click', () => {
+  document.getElementById('help-modal').classList.remove('show');
+});
+document.getElementById('help-close-btn').addEventListener('click', () => {
+  document.getElementById('help-modal').classList.remove('show');
+});
+
+document.getElementById('stats-close').addEventListener('click', () => {
+  document.getElementById('stats-modal').classList.remove('show');
+});
+document.getElementById('stats-close-btn').addEventListener('click', () => {
+  document.getElementById('stats-modal').classList.remove('show');
+});
+
+document.getElementById('settings-btn').addEventListener('click', () => {
+  document.getElementById('settings-modal').classList.add('show');
+});
+document.getElementById('settings-close').addEventListener('click', () => {
+  document.getElementById('settings-modal').classList.remove('show');
+});
+document.getElementById('settings-close-btn').addEventListener('click', () => {
+  document.getElementById('settings-modal').classList.remove('show');
+});
+
+document.getElementById('stats-reset-btn').addEventListener('click', () => {
+  if (confirm('Tüm istatistikler silinecek. Emin misiniz?')) {
+    ['daily','unlimited','challenge','zen'].forEach(mode => {
+      [4,5,6,7].forEach(len => {
+        localStorage.removeItem(`roodle_stats_${mode}_${len}`);
+      });
+    });
+    updateStatsBar();
+    renderStatsModal();
+    showToast('İstatistikler sıfırlandı!');
+  }
+});
+
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) overlay.classList.remove('show');
+  });
+});
+
+// ===== NEW GAME =====
+function newGame() {
+  if (gameMode === 'daily') {
+    targetWord = getTodayWord(wordLength);
+    
+    const stats = getStats(gameMode, wordLength);
+    const today = new Date().toDateString();
+    if (stats.lastDate === today && stats.played > 0) {
+      showToast('Bugünkü kelimeyi zaten oynadın! Sınırsız modu dene.');
+      return false;
+    }
+  } else {
+    targetWord = getRandomWord(wordLength);
+  }
+
+  gameOver = false;
+  currentRow = 0;
+  currentCol = 0;
+  currentGuess = [];
+  gameStartTime = Date.now();
+  powerupsUsed = { hint: false, eliminate: false, skip: false };
+  
+  buildGrid();
+  buildKeyboard();
+  
+  const panel = document.getElementById('powerups-panel');
+  panel.style.display = (gameMode === 'zen' || gameMode === 'unlimited') ? 'flex' : 'none';
+  
+  ['hint-btn','eliminate-btn','skip-btn'].forEach(id => {
+    document.getElementById(id).classList.remove('used');
+  });
+
+  const challengeInfo = document.getElementById('challenge-info');
+  if (gameMode === 'challenge') {
+    challengeInfo.style.display = 'block';
+    challengeInfo.innerHTML = '<strong>Meydan Okuma:</strong> Sadece 4 tahmin hakkın var!';
+  } else {
+    challengeInfo.style.display = 'none';
+  }
+
+  document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('show'));
+  return true;
+}
+
+document.getElementById('result-new-btn').addEventListener('click', () => {
+  newGame();
+});
+
+// ===== MODE SWITCHING =====
+document.querySelectorAll('.mode-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    const mode = tab.dataset.mode;
+    if (mode === gameMode) return;
+    
+    document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    gameMode = mode;
+    
+    newGame();
+    showToast(`${tab.textContent.replace('Yeni', '').trim()} modu aktif`);
+  });
+});
+
+// ===== WORD LENGTH SELECTOR =====
+document.querySelectorAll('.wl-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const len = parseInt(btn.dataset.len);
+    if (len === wordLength) return;
+    
+    document.querySelectorAll('.wl-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    wordLength = len;
+    
+    newGame();
+    showToast(`${len} harfli kelimeler seçildi`);
+  });
+});
+
+// ===== POWERUPS =====
+document.getElementById('hint-btn').addEventListener('click', () => {
+  if (powerupsUsed.hint || gameOver) return;
+  
+  const guessedLetters = new Set();
+  for (let r = 0; r < currentRow; r++) {
+    board[r].forEach(tile => {
+      if (tile.textContent) guessedLetters.add(tile.textContent);
+    });
+  }
+  
+  const remaining = targetWord.split('').filter(l => !guessedLetters.has(l));
+  if (remaining.length === 0) {
+    showToast('Tüm harfler zaten bulundu!');
+    return;
+  }
+  
+  const hint = remaining[Math.floor(Math.random() * remaining.length)];
+  showToast(`💡 İpucu: "${hint}" harfi kelimede var`);
+  powerupsUsed.hint = true;
+  document.getElementById('hint-btn').classList.add('used');
+});
+
+document.getElementById('eliminate-btn').addEventListener('click', () => {
+  if (powerupsUsed.eliminate || gameOver) return;
+  
+  const absentLetters = Object.keys(keyStates).filter(k => keyStates[k] === 'absent');
+  if (absentLetters.length === 0) {
+    showToast('Henüz yanlış harf yok!');
+    return;
+  }
+  
+  showToast(`🗑️ ${absentLetters.length} yanlış harf temizlendi`);
+  powerupsUsed.eliminate = true;
+  document.getElementById('eliminate-btn').classList.add('used');
+});
+
+document.getElementById('skip-btn').addEventListener('click', () => {
+  if (powerupsUsed.skip || gameOver) return;
+  
+  if (confirm('Bu kelimeyi atlamak istediğinden emin misin?')) {
+    powerupsUsed.skip = true;
+    document.getElementById('skip-btn').classList.add('used');
+    newGame();
+    showToast('⏭️ Yeni kelime yüklendi');
+  }
+});
+
+// ===== SETTINGS =====
+function loadSettings() {
+  const saved = localStorage.getItem('roodle_settings');
+  if (saved) {
+    settings = JSON.parse(saved);
+  }
+  
+  document.getElementById('dark-mode-toggle').checked = settings.darkMode;
+  document.getElementById('sound-toggle').checked = settings.sound;
+  document.getElementById('animation-toggle').checked = settings.animations;
+}
+
+function saveSettings() {
+  localStorage.setItem('roodle_settings', JSON.stringify(settings));
+}
+
+document.getElementById('dark-mode-toggle').addEventListener('change', (e) => {
+  settings.darkMode = e.target.checked;
+  saveSettings();
+});
+
+document.getElementById('sound-toggle').addEventListener('change', (e) => {
+  settings.sound = e.target.checked;
+  saveSettings();
+});
+
+document.getElementById('animation-toggle').addEventListener('change', (e) => {
+  settings.animations = e.target.checked;
+  saveSettings();
+});
+
+// ===== INIT =====
+function init() {
+  loadSettings();
+  updateStatsBar();
+  
+  if (!localStorage.getItem('roodle_seen_help')) {
+    setTimeout(() => {
+      document.getElementById('help-modal').classList.add('show');
+      localStorage.setItem('roodle_seen_help', '1');
+    }, 800);
+  }
+  
+  newGame();
+}
+
+// ===== RESPONSIVE CANVAS =====
+window.addEventListener('resize', () => {
+  const canvas = document.getElementById('confetti-canvas');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+});
+
+// ===== LOGO EASTER EGG =====
+let logoClickCount = 0;
+document.getElementById('logo').addEventListener('click', () => {
+  logoClickCount++;
+  if (logoClickCount === 5) {
+    showToast('🎉 Gizli mod açıldı!');
+    document.body.style.filter = 'hue-rotate(180deg)';
+    setTimeout(() => {
+      document.body.style.filter = '';
+      logoClickCount = 0;
+    }, 3000);
+  }
+});
+
+init();
+</script>
+</body>
+</html>
