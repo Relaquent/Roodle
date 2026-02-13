@@ -831,7 +831,7 @@ header {
 </div>
 
 <header>
-  <div class="logo">ROODLE</div>
+  <div class="logo">ROODLE by Relaquent</div>
   <div class="header-controls">
     <div class="user-profile" id="user-profile">
       <div class="user-avatar" id="user-avatar">🎮</div>
@@ -843,6 +843,7 @@ header {
         <div class="user-xp-fill" id="user-xp-fill" style="width: 0%"></div>
       </div>
     </div>
+    <button class="icon-btn" id="leaderboard-btn" title="Sıralama Tablosu">🏆</button>
     <button class="icon-btn" id="help-btn">❓</button>
   </div>
 </header>
@@ -886,7 +887,7 @@ header {
       <div class="opponent-progress" id="opponent-progress">Bekliyor...</div>
     </div>
   </div>
-  
+  <div id="turn-display" style="width: 100%; margin-bottom: 16px;"></div>
   <div class="grid" id="grid"></div>
   <div class="keyboard" id="keyboard"></div>
 </div>
@@ -950,6 +951,16 @@ header {
       <div style="font-size: 36px; font-weight: 900; color: var(--accent); font-family: var(--font-display);" id="result-xp-amount">+50</div>
     </div>
     <button class="btn btn-primary" id="result-new-btn">Yeni Oyun 🎲</button>
+  </div>
+</div>
+
+<!-- Leaderboard Modal -->
+<div class="modal-overlay" id="leaderboard-modal">
+  <div class="modal">
+    <button class="modal-close" id="leaderboard-close">✕</button>
+    <h2>🏆 Sıralama Tablosu</h2>
+    <div id="leaderboard-content" style="max-height: 500px; overflow-y: auto; margin-top: 20px;"></div>
+    <button class="btn btn-secondary" id="leaderboard-close-btn" style="margin-top: 20px;">Kapat</button>
   </div>
 </div>
 
@@ -1052,18 +1063,28 @@ function connectToServer() {
   });
 
   socket.on('game:start', (data) => {
-    console.log('Game started:', data);
-    currentGameId = data.gameId;
-    opponentData = data.opponent;
-    wordLength = data.wordLength;
-    
-    document.getElementById('queue-btn').classList.remove('searching');
-    document.getElementById('queue-section').style.display = 'none';
-    
-    showOpponentPanel();
-    newGame();
-    showToast(`🎮 Oyun başladı! Rakip: ${opponentData.nick}`);
-  });
+  console.log('Game started:', data);
+  currentGameId = data.gameId;
+  opponentData = data.opponent;
+  wordLength = data.wordLength;
+  
+  document.getElementById('queue-btn').classList.remove('searching');
+  document.getElementById('queue-section').style.display = 'none';
+  
+  showOpponentPanel();
+  newGame();
+  
+  // Turn display
+  if (data.yourTurn) {
+    enableInput();
+    updateTurnDisplay(true, opponentData.nick);
+    showToast(`🎮 Oyun başladı! SENİN SIRAIN - Rakip: ${opponentData.nick}`);
+  } else {
+    disableInput();
+    updateTurnDisplay(false, opponentData.nick);
+    showToast(`🎮 Oyun başladı! RAKIP BAŞLIYOR - Rakip: ${opponentData.nick}`);
+  }
+});
 
   socket.on('game:guess:result', (data) => {
     console.log('Guess result:', data);
@@ -1088,23 +1109,55 @@ function connectToServer() {
   });
 
   socket.on('game:end', (data) => {
-    console.log('Game ended:', data);
-    gameOver = true;
-    targetWord = data.targetWord;
-    
-    if (data.progress) {
-      playerProfile = { ...playerProfile, ...data.progress };
-      updateProfileDisplay();
-    }
-    
-    setTimeout(() => {
-      showResultModal(data);
-    }, 1000);
-  });
+  console.log('Game ended:', data);
+  gameOver = true;
+  targetWord = data.targetWord;
+  
+  if (data.progress) {
+    playerProfile = { ...playerProfile, ...data.progress };
+    updateProfileDisplay();
+  }
+  
+  disableInput();
+  updateTurnDisplay(false, '');
+  
+  setTimeout(() => showResultModalMultiplayer(data), 1000);
+});
 
-  socket.on('game:opponent:disconnected', () => {
-    showToast('Rakip bağlantısı koptu');
-  });
+  // Turn-based events
+socket.on('game:turn:start', (data) => {
+  console.log('Your turn!', data);
+  showToast('Senin sıran! 🎯');
+  enableInput();
+  updateTurnDisplay(true, opponentData?.nick || 'Rakip');
+});
+
+socket.on('game:opponent:guess', (data) => {
+  console.log('Opponent guessed:', data);
+  const { guess, result, opponentWon, yourTurn } = data;
+  
+  // Rakibin tahminini göster
+  displayOpponentGuess(guess, result);
+  
+  if (opponentWon) {
+    showToast('Rakibiniz kazandı! 😔');
+    gameOver = true;
+    disableInput();
+  } else if (yourTurn) {
+    showToast('Senin sıran! 🎯');
+    enableInput();
+    updateTurnDisplay(true, opponentData?.nick || 'Rakip');
+  } else {
+    disableInput();
+    updateTurnDisplay(false, opponentData?.nick || 'Rakip');
+  }
+});
+
+// Leaderboard
+socket.on('leaderboard:update', (data) => {
+  console.log('Leaderboard updated:', data);
+  renderLeaderboard(data.leaderboard);
+});
 
   socket.on('error', (data) => {
     console.error('Server error:', data);
@@ -1500,6 +1553,24 @@ document.getElementById('profile-close').addEventListener('click', () => {
 document.getElementById('help-btn').addEventListener('click', () => {
   document.getElementById('help-modal').classList.add('show');
 });
+
+// Leaderboard modal
+document.getElementById('leaderboard-btn').addEventListener('click', () => {
+  if (socket && socket.connected) {
+    socket.emit('leaderboard:get');
+  } else {
+    showToast('Leaderboard için sunucuya bağlanmalısınız!');
+  }
+  document.getElementById('leaderboard-modal').classList.add('show');
+});
+
+document.getElementById('leaderboard-close').addEventListener('click', () => {
+  document.getElementById('leaderboard-modal').classList.remove('show');
+});
+
+document.getElementById('leaderboard-close-btn').addEventListener('click', () => {
+  document.getElementById('leaderboard-modal').classList.remove('show');
+});
 document.getElementById('help-close').addEventListener('click', () => {
   document.getElementById('help-modal').classList.remove('show');
 });
@@ -1526,6 +1597,231 @@ document.querySelectorAll('.wl-btn').forEach(btn => {
     showToast(`${len} harfli kelimeler seçildi`);
   });
 });
+
+// ===== TURN DISPLAY =====
+function updateTurnDisplay(isYourTurn, opponentNick) {
+  const turnDisplay = document.getElementById('turn-display');
+  if (!turnDisplay) return;
+  
+  if (gameMode !== 'multiplayer' || !currentGameId) {
+    turnDisplay.innerHTML = '';
+    return;
+  }
+  
+  if (isYourTurn) {
+    turnDisplay.innerHTML = `
+      <div style="
+        background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+        color: var(--bg);
+        padding: 12px 24px;
+        border-radius: 12px;
+        font-weight: 800;
+        text-align: center;
+        animation: pulse 1.5s ease-in-out infinite;
+        box-shadow: var(--glow);
+      ">
+        ⚡ Senin Sıran!
+      </div>
+    `;
+  } else {
+    turnDisplay.innerHTML = `
+      <div style="
+        background: var(--surface2);
+        border: 1px solid var(--border);
+        color: var(--text-muted);
+        padding: 12px 24px;
+        border-radius: 12px;
+        font-weight: 700;
+        text-align: center;
+      ">
+        ⏳ ${opponentNick}'in sırası...
+      </div>
+    `;
+  }
+}
+
+function enableInput() {
+  document.querySelectorAll('.key').forEach(key => {
+    key.style.pointerEvents = 'all';
+    key.style.opacity = '1';
+  });
+}
+
+function disableInput() {
+  document.querySelectorAll('.key').forEach(key => {
+    key.style.pointerEvents = 'none';
+    key.style.opacity = '0.5';
+  });
+}
+
+// ===== OPPONENT GUESS DISPLAY =====
+function displayOpponentGuess(guess, result) {
+  // Boş satır bul
+  for (let row = 0; row < board.length; row++) {
+    const firstTile = board[row][0];
+    if (!firstTile.textContent || firstTile.textContent === '') {
+      // Bu satıra rakibin tahminini yaz
+      guess.split('').forEach((letter, col) => {
+        if (col >= wordLength) return;
+        
+        const tile = board[row][col];
+        tile.textContent = letter;
+        tile.classList.add('filled');
+        
+        setTimeout(() => {
+          tile.classList.add('reveal');
+          setTimeout(() => {
+            tile.classList.add(result[col]);
+            updateKeyState(letter, result[col]);
+          }, 300);
+        }, col * 150);
+      });
+      
+      break;
+    }
+  }
+}
+
+// ===== LEADERBOARD =====
+function renderLeaderboard(data) {
+  const container = document.getElementById('leaderboard-content');
+  if (!container) return;
+  
+  if (!data || data.length === 0) {
+    container.innerHTML = `
+      <div style="text-align: center; padding: 40px; color: var(--text-muted);">
+        Henüz sıralamada kimse yok
+      </div>
+    `;
+    return;
+  }
+  
+  container.innerHTML = `
+    <div style="display: flex; flex-direction: column; gap: 8px;">
+      ${data.map((player, index) => {
+        const medalEmoji = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '';
+        const isTopThree = index < 3;
+        
+        return `
+          <div style="
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px;
+            background: ${isTopThree ? 'linear-gradient(135deg, var(--surface2), var(--surface3))' : 'var(--surface2)'};
+            border: 1px solid ${isTopThree ? 'var(--accent)' : 'var(--border)'};
+            border-radius: 12px;
+            transition: all 0.3s;
+            cursor: pointer;
+          " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='var(--shadow-md)'" onmouseout="this.style.transform=''; this.style.boxShadow=''">
+            
+            <div style="
+              min-width: 50px;
+              height: 50px;
+              background: ${index < 3 ? (index === 0 ? 'linear-gradient(135deg, #FFD700, #FFA500)' : index === 1 ? 'linear-gradient(135deg, #C0C0C0, #808080)' : 'linear-gradient(135deg, #CD7F32, #8B4513)') : 'var(--surface3)'};
+              border-radius: 10px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              font-weight: 900;
+              font-size: 20px;
+              color: ${isTopThree ? '#000' : 'var(--text)'};
+              font-family: var(--font-display);
+            ">
+              ${medalEmoji || (index + 1)}
+            </div>
+            
+            <div style="flex: 1;">
+              <div style="font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 4px;">
+                ${player.nick}
+              </div>
+              <div style="font-size: 12px; color: var(--text-muted); font-family: var(--font-mono);">
+                W: ${player.wins || 0} | L: ${player.losses || 0} | D: ${player.draws || 0}
+                ${player.winStreak > 0 ? ` | 🔥 ${player.winStreak}` : ''}
+              </div>
+            </div>
+            
+            <div style="text-align: right;">
+              <div style="font-size: 24px; font-weight: 900; color: var(--accent); font-family: var(--font-display);">
+                ${player.rankedPoints}
+              </div>
+              <div style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); margin-top: 2px;">
+                Lvl ${player.level}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+  `;
+}
+
+// ===== MULTIPLAYER RESULT MODAL =====
+function showResultModalMultiplayer(data) {
+  const modal = document.getElementById('result-modal');
+  const title = document.getElementById('result-title');
+  const msg = document.getElementById('result-msg');
+  const answerDiv = document.getElementById('result-answer');
+  const wordEl = document.getElementById('result-word');
+  const xpAmount = document.getElementById('result-xp-amount');
+
+  if (data.result === 'win') {
+    title.textContent = '🎉 KAZANDIN!';
+    msg.innerHTML = `
+      Rakibini yendin!<br>
+      <div style="margin-top: 12px; padding: 12px; background: var(--surface3); border-radius: 8px;">
+        <span style="color: ${data.rankedChange > 0 ? 'var(--accent)' : 'var(--accent3)'}; font-weight: 900; font-size: 20px;">
+          ${data.rankedChange > 0 ? '+' : ''}${data.rankedChange} Ranked Puan
+        </span><br>
+        <span style="font-size: 14px; color: var(--text-muted); margin-top: 4px; display: block;">
+          Yeni Puan: ${data.newRankedPoints}
+        </span>
+      </div>
+    `;
+    answerDiv.style.display = 'none';
+  } else if (data.result === 'lose') {
+    title.textContent = '😔 Kaybettin';
+    msg.innerHTML = `
+      Rakibin kazandı<br>
+      <div style="margin-top: 12px; padding: 12px; background: var(--surface3); border-radius: 8px;">
+        <span style="color: var(--accent3); font-weight: 900; font-size: 20px;">
+          ${data.rankedChange} Ranked Puan
+        </span><br>
+        <span style="font-size: 14px; color: var(--text-muted); margin-top: 4px; display: block;">
+          Yeni Puan: ${data.newRankedPoints}
+        </span>
+      </div>
+    `;
+    answerDiv.style.display = 'block';
+    if (wordEl) wordEl.textContent = data.targetWord;
+  } else if (data.result === 'draw') {
+    title.textContent = '🤝 Beraberlik!';
+    msg.innerHTML = `
+      Kimse bulamadı<br>
+      <div style="margin-top: 12px; padding: 12px; background: var(--surface3); border-radius: 8px;">
+        <span style="color: var(--accent4); font-weight: 900; font-size: 20px;">
+          ${data.rankedChange > 0 ? '+' : ''}${data.rankedChange} Ranked Puan
+        </span><br>
+        <span style="font-size: 14px; color: var(--text-muted); margin-top: 4px; display: block;">
+          Yeni Puan: ${data.newRankedPoints}
+        </span>
+      </div>
+    `;
+    answerDiv.style.display = 'block';
+    if (wordEl) wordEl.textContent = data.targetWord;
+  }
+
+  xpAmount.textContent = `+${data.xpGained}`;
+  
+  if (data.leveledUp) {
+    setTimeout(() => {
+      showToast(`🎊 Seviye Atladın! ${RANKS[playerProfile.level].name}`);
+      launchConfetti();
+    }, 1000);
+  }
+
+  setTimeout(() => modal.classList.add('show'), 600);
+}
 
 // ===== INIT =====
 function init() {
