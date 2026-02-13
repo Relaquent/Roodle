@@ -69,10 +69,10 @@ const activeGames = new Map(); // gameId -> game data
 
 // ===== WORD LISTS =====
 const WORD_LISTS = {
-  4: ["KAPI", "SORU", "BABA", "ASLI", "ELMA", "YAZI", "KALE", "KOŞU", "BİNA", "DANA", "ARZU", "ÖYKÜ", "SÜRE", "HAVA", "KISA", "KUZU", "PARA", "MASA", "MODA", "ORAN", "KUTU", "DERE", "KEÇİ", "SAYI", "KAYI", "GİDİ", "İLKE", "KİRA", "PAŞA", "SEVİ", "UYKU", "AYNA", "BOYA", "ADAM", "ESKİ", "ANNE", "DERİ", "ÖLÇÜ", "GAGA", "HATA", "OLAY", "SENE", "ŞAKA", "İMZA", "KATI", "MEZE", "KORO", "LİSE", "SAHA", "YAPI"],
-  5: ["AKŞAM", "BALON", "CADDE", "DALGA", "ELMAS", "FENER", "GÜNEŞ", "HABER", "İNSAN", "JOKER", "KAYIK", "LIMON", "MASAL", "NEFES", "ORMAN", "PAZAR", "RADYO", "SABAH", "ŞEHİR", "TARLA", "UYGUR", "VÜCUT", "YALAN", "ZAMAN", "ABONE", "BAHAR", "CEKET", "DOLAP", "EMLAK", "FİDAN", "GURUR", "HAYAT", "ISLIK", "İÇKİT", "JETON", "KASAP", "LİSTE", "MERAK", "NODUL", "ORTAK", "PİLOT", "RAKET", "SAYFA", "ŞARKI", "TAVAN", "UZMAN", "VATAN", "YAREN", "ZİHİN"],
-  6: ["GARDOP", "KARTAL", "YARDIM", "BALKON", "GÖZLÜK", "TÜRKÇE", "MANTIK", "PİJAMA", "SÖZLÜK", "TOPRAK", "SİNCAP", "HEYKEL", "KUYRUK", "MİLYON", "ÇEYREK", "DOKTOR", "ZEYTİN", "BARDAK", "GAYRET", "MEKTUP", "FIRTIN", "KORKUŞ", "KABİNE", "RESMEN", "ŞÖVALE", "KOLTUK", "YAPRAK", "KAPTAN", "SİGARA", "GURBET", "FISTIK", "HAYVAN", "SARMAL", "BİRLİK", "EKMEKÇ", "CÜZDAN", "SULTAN", "MİKROP", "KAMYON", "DİKKAT"],
-  7: ["ANAYASA", "BELEDİYE", "ÇİSANTİ", "DİLEKÇE", "EMİRGAN", "FASULYE", "GÖKYÜZÜ", "HAKARET", "ISPANAK", "İSKELET", "JANDARMA", "KABURGA", "LOKANTA", "MERHABA", "NAKLİYE", "OKYANUS", "PENCERE", "RANDEVU", "SANDALYE", "ŞAMPUAN", "TELEFON", "UYGULAMA", "VAZİYET", "YUMURTA", "ZAFİYET", "AHTAPOT", "BAŞKENT", "CESARET", "DENEYİM", "EĞLENCE"]
+  4: ["KAPI", "SORU", "BABA", "ASLI", "ELMA", "YAZI", "KALE", "KOŞU", "BİNA", "DANA", "ARZU", "ÖYKÜ", "SÜRE", "HAVA", "KISA", "KUZU", "PARA", "MASA", "MODA", "ORAN", "KUTU", "DERE", "KEÇİ", "SAYI", "KAYI", "GİDİ", "İLKE", "KİRA", "PAŞA", "SEVİ", "UYKU", "AYNA", "BOYA", "ADAM", "ESKİ", "ANNE", "DERİ", "ÖLÇÜ", "GAGA", "HATA", "OLAY", "SENE", "ŞAKA", "İMZA", "KATI", "MEZE", "KORO", "LİSE", "SAHA", "YAPI", "KURS", "GURU", "TAKI", "KOZA", "ARTI", "DURU", "FARE", "YARI", "ÖDÜL", "AYAK", "HOCA", "ALAN", "ÇARE", "KARI", "EŞYA", "İLAÇ", "MAŞA", "KULE", "OVAL", "SIRA", "FOTO", "YÜZÜ", "BATI", "DOĞU", "KÜRE", "ASKI", "ÇENE", "DİZİ", "KOLA", "GECE", "CİNS", "ARPA", "SOPA", "İLİK", "MÜZE", "SİTE", "ÜLKE", "CADI", "LİRA", "GÜCÜ", "EKİN", "ADET", "VALE", "ÇATI", "AYIP", "BORÇ", "KAFE", "DERS", "ÖZEL", "KARA", "İSİM", "HAYI", "ÇITA", "KİLO", "BUSE", "ÖREN", "AMİR", "EKİM", "DANA", "ZARF", "TAHT", "İĞNE", "ÇİVİ", "EĞRİ", "KART", "KAYA", "İMHA", "EKOZ", "HİBE", "VALİ", "İCAT", "LİMAN", "KREP", "KAZA", "İNCE", "KÖŞE", "AKIL", "AYAR", "BONE", "DÜZE", "İCRA", "KIRA", "SEDA", "BÜRO", "SÖZÜ", "ŞİİR", "AVCI", "SİLO", "BANT", "KOTA", "MİNA", "CİLT", "İRAN", "FİRE", "FİDE", "ÖNCÜ", "OKUL", "ADIM", "AZIK", "DİLİ", "KAZI", "AKIM", "EŞİK", "AZİZ", "KORO", "ALAY", "GİŞE", "ŞİLE", "ÖDEM", "SİHİ", "EĞİM", "ÇİFT", "BORU", "SULU", "KATI", "BİRE", "KÜFE", "DÜET", "ALET", "MİNE", "İDOL", "İKNA", "İDRA", "KİRE", "KELE", "KÖYÜ", "RİSK", "SİRK", "TAZE", "TAPU", "TEPE", "VİZE", "YEDİ", "ZAMİ", "ÖDÜN", "YARA", "TANI", "KORU", "ERİM", "OLTA", "SOBA", "SAPA", "DOKU", "KEŞF", "ÜMİT", "GÖZE", "FAİZ", "BALE", "KOYU", "İNCİ", "GİZİ", "KATI", "ORSA"],
+  5: ["AKŞAM", "BALON", "CADDE", "DALGA", "ELMAS", "FENER", "GÜNEŞ", "HABER", "İNSAN", "JOKER", "KAYIK", "LIMON", "MASAL", "NEFES", "ORMAN", "PAZAR", "RADYO", "SABAH", "ŞEHİR", "TARLA", "UYGUR", "VÜCUT", "YALAN", "ZAMAN", "ABONE", "BAHAR", "CEKET", "DOLAP", "EMLAK", "FİDAN", "GURUR", "HAYAT", "ISLIK", "İÇKİT", "JETON", "KASAP", "LİSTE", "MERAK", "NODUL", "ORTAK", "PİLOT", "RAKET", "SAYFA", "ŞARKI", "TAVAN", "UZMAN", "VATAN", "YAREN", "ZİHİN", "ACELE", "BALIK", "CİHAN", "DEMİR", "EGZOZ", "FATUR", "GÖLGE", "HUKUK", "ILGAZ", "İPUCU", "JİLET", "KAVUN", "LEVHA", "MİRAS", "NAKIŞ", "ORHAN", "PARÇA", "REÇEL", "SOLUK", "ŞEKER", "TABLO", "UÇKUN", "VALİZ", "YALIN", "ZORLU", "ADRES", "BÖLGE", "CÜMLE", "DÜNYA", "EŞARP", "FIRÇA", "GÖREV", "HESAP", "IŞIMA", "İNKAR", "KABLO", "LOKMA", "MÜZİK", "NİMET", "OPERA", "PEDAL", "ROKET", "SEPET", "ŞÖYLE", "TÜFEK", "UYARI", "VAKIF", "YALDI", "ZİRAİ", "AHLAK", "BELGE", "CEVAP", "DİREK", "ERKEK", "FİYAT", "GÖRÜŞ", "HUZUR", "ASLAN", "İSKEÇ", "KADER", "LAZIM", "METRO", "NESİL", "ORİJİN", "PROJE", "ROMAN", "SÜREÇ", "ŞAHIS", "TEKİN", "UMUTL", "VOTKA", "YAZAR", "ZARAR", "ALTIN", "BÖREK", "CESUR", "DÜĞÜN", "EVRAK", "FLAMA", "GÜVEN", "HİSSE", "IDDI", "İZMİR", "KİTAP", "LİMAN", "MODEL", "NOKTA", "OTİZM", "PAMUK", "REHİN", "SİLAH", "ŞERİT", "TURŞU", "UÇMAK", "VAKİT", "YEMEK", "ZİNCİ", "ANTEN", "BEYAZ", "CAMIZ", "DÜŞÜŞ", "EKSİK", "FORMA", "GÜZEL", "HELVA", "IŞIMA", "İHRAÇ", "KAVGA", "LİSAN", "MADDE", "NAZAR", "OYNAN", "PASTA", "REJİM", "SINAV", "ŞURUP", "TAŞIT", "UYGAR", "VİLLA", "YARIŞ", "ZEBRA", "AYRAN", "BİLET", "CİHAZ", "DURAK", "EYLEM", "FİNAL", "GELİN", "HAKİM", "ISSIZ", "İNCİR", "KAYIP", "LİMİT", "MESAJ", "NİSAN", "ORGAN", "PENYE", "REKOR", "SİVRİ", "ŞÜPHE", "TEPSİ", "UZAYI", "VİRAJ", "YÜZEY", "ZALİM", "ARABA", "BARIŞ", "COŞKU", "DENİZ", "ERKEN", "FESAT", "KAFİR", "HALEF", "ITRAK", "İLHAK", "KARGO", "LAKAP", "MEYVE", "NİÇİN", "OKUMA", "PLAKA", "RADAR", "SAYGI", "ŞOFÖR", "TAVŞA", "UÇKUN", "VURGU", "YAKIN", "ZAMLI"],
+  6: ["GARDOP", "KARTAL", "YARDIM", "BALKON", "GÖZLÜK", "TÜRKÇE", "MANTIK", "PİJAMA", "SÖZLÜK", "TOPRAK", "SİNCAP", "HEYKEL", "KUYRUK", "MİLYON", "ÇEYREK", "DOKTOR", "ZEYTİN", "BARDAK", "GAYRET", "MEKTUP", "FIRTIN", "KORKUŞ", "KABİNE", "RESMEN", "ŞÖVALE", "KOLTUK", "YAPRAK", "KAPTAN", "SİGARA", "GURBET", "FISTIK", "HAYVAN", "SARMAL", "BİRLİK", "EKMEKÇ", "CÜZDAN", "SULTAN", "MİKROP", "KAMYON", "DİKKAT", "ŞEFFAF", "VİCDAN", "BAYRAM", "İSTİFA", "KAYNAK", "ADALET", "MUTFAK", "ŞEMSİYE", "TABİAT", "HAYRET", "MÜHÜRL", "DESTAN", "PİKNİK", "KAYKAY", "TAVŞAN", "KONSER", "PİŞMAN", "SAĞLIK", "BİSKEÇ", "MERCAN", "KUDRET", "KISMET", "LASTİK", "NAFAKA", "GAZETE", "MERKEZ", "FELSEF", "KIYMET", "YILDIZ", "SULHÇU", "KEPÇEÇ", "ZAHMET", "TERMİS", "MEYDAN", "ŞAHANE", "İBADET", "KUVVET", "HASRET", "BİRLİK", "VİTRİN", "SİYASET", "KARPUZ", "SİSİLY", "MİSÜLÜ", "KÜLTÜR", "PERDEY", "DİRSEK", "DURDUR", "KAYGAN", "İŞARET", "PARMAK", "TİMSAH", "ŞARJÖR", "MİSAİR", "BOYNUZ", "HORTUM", "SANDAL", "FİLİSİ", "KAYISI", "MAHKUM", "TEKNİK", "YEMİNL", "SİİRTİ", "KİMLİK", "KONTAK", "CÖMERT", "HÜCİRE", "TERLİK", "SİSTEM", "PORSEN", "KUMSAL", "YÜZÜCÜ", "SARMAL", "KAYKAY", "SİRKET", "DİREKÇ", "KİSVEL", "KAYNAŞ", "GÖRSEL", "KAZANÇ", "FİZİKİ", "İHANET", "SIRDAŞ", "BÜLBÜL", "KABARE", "SERVİS", "İSKELE", "KÖPRÜS", "BASKIN", "GÜNCEL", "YALÇIN", "MECLİS", "KORUMA", "KIBRIS", "SİRİKE", "TASARI", "KEŞKEK", "GÜLMEK", "İMKANI", "TÜCCAR", "MASRAF", "HEYBET", "PİRİNÇ", "ŞÖHRET", "TEKLİF", "KÜSMEK", "YAKAMO", "FERSAH", "İSTEKİ", "BİLYAÇ", "KUNDUZ", "KASTEN", "TEMSİL", "KAYNAK", "KOSTÜM", "HESABI", "FESLEĞ", "GERÇEK", "MODERN", "KIYAFE", "KEMANE", "DİNGİL", "BİTKİS", "SÜRGÜN", "İHRACAT", "YALDIZ", "TAKVİM", "TUNCEL", "SAYDAM", "KURŞUN", "SÜSLEM", "TERHİS", "VARLIK", "YANDAŞ", "KORNET", "GÜNCEL", "HAYDİÇ", "KUMPAS", "MİNDER", "SÜREKL", "KIŞLIK", "ŞİMDİK", "GURBET", "FIRTIN", "KABİLE", "İSABET", "KAYGIN", "DÜELLO", "MERHEM", "SABIKA", "TAKDİM", "BİTİRİ", "DÖNEMEÇ", "HEYCANLI", "ŞELALE", "ZALİMİ", "KAVRAM", "KOŞULU", "ZİGZAG"],
+  7: ["ANAYASA", "BELEDİYE", "ÇİSANTİ", "DİLEKÇE", "EMİRGAN", "FASULYE", "GÖKYÜZÜ", "HAKARET", "ISPANAK", "İSKELET", "JANDARMA", "KABURGA", "LOKANTA", "MERHABA", "NAKLİYE", "OKYANUS", "PENCERE", "RANDEVU", "SANDALYE", "ŞAMPUAN", "TELEFON", "UYGULAMA", "VAZİYET", "YUMURTA", "ZAFİYET", "AHTAPOT", "BAŞKENT", "CESARET", "DENEYİM", "EĞLENCE", "FABRİKA", "GÖSTERİ", "HASTANE", "IHLAMUR", "İSTİDAT", "KAVANOZ", "LAVANTA", "MİSAFİR", "NUMARAL", "OYUNCU", "PIRLANTA", "REFAHAT", "SAYGILI", "ŞAŞIRMA", "TİYATRO", "UZUNLUK", "VERİMLİ", "YETENEK", "ZORUNLU", "AMBALAJ", "BERABER", "COĞRAFA", "DÜŞÜNCE", "EMNİYET", "FESTİVAL", "GÖRÜNTÜ", "HAYSİYET", "ISIRGAN", "İLGİNÇTİ", "KAZANIM", "LEVREKL", "MUTLULU", "NAMUSLU", "OTOMATİK", "PANAYIR", "REKABET", "SİNEMACI", "ŞAKAYIK", "TEMİZLİK", "UZMANLA", "VALİZLE", "YAZILIM", "ZENGİNL", "AKTARIM", "BİSİKLET", "ÇERÇEVE", "DEĞİRMEN", "EFSANEVİ", "FELAKET", "GİRİŞİM", "HAYALET", "ISMARLA", "İMTİHAN", "KARANFİL", "LİMONATA", "MALİYET", "NİŞASTA", "OKSİJEN", "PERŞEMBE", "SAMİMİYET", "ŞEHİRLİ", "TARTIŞMA", "ÜRETİCİ", "VARİSÇİ", "YIKILMA", "ZABITALA", "ANLAYIŞ", "BAĞLAMA", "CEPHANE", "DÜZENLİ", "EKSİKLİK", "FERAHLIK", "GÖREVLİ", "HAREKET", "IŞILDAK", "İÇECEKLİ", "KONTROL", "LÜBEYYE", "MİLYARD", "NEZAKET", "ORDUEVİ", "PATATES", "REÇETELİ", "SÜREKLİ", "ŞİKAYET", "TOPLANTI", "ÜZÜNTÜLÜ", "VİCDANLI", "YÖNETİM", "ZÜMRÜT", "ALTYAPI", "BULANIK", "CÖMERTLİK", "DÜZELTME", "ELBİSELİ", "FAALİYET", "GÜNEŞLİ", "HAZİNEM", "İLANLAR", "KÜLTÜRLÜ", "MADALYA", "NİTELİK", "OYUNCAK", "PORSİYON", "REHBERLİK", "SEVİYELİ", "ŞAHSİYET", "TAMİRAT", "UYARICI", "VAKİTLİ", "YARATIK", "ZİYARET", "ASİSTAN", "BÖLGESEL", "ÇALIŞKAN", "DİNAMİK", "EĞİTMEN", "FOTOĞRAF", "GÖREVDE", "HAVADİS", "ISIRMAK", "İLETİŞİM", "KAPTANLI", "LAVABOLU", "MANTARLI", "NÖBETÇİ", "OTURMAK", "PARLAMA", "REKORCU", "SATIŞLAR", "ŞAŞIRTMA", "TASARIM", "ÜYELİKLER", "VALİZLER", "YAZILIM", "ZAMANDA", "AVUKATLIK", "BİLDİRİM", "ÇEVRECİ", "DİKKATLİ", "EKİPMAN", "FIKRAAN", "GÜLERİZ", "HAYIRLI", "İSABETLİ", "KAPASİTE", "LAHMACUN", "MERİNOS", "NUMARALI", "ORMANCI", "PANDÜL", "SESSİZLİK", "TECRÜBE", "VİRGÜLLÜ", "YETKİLİ", "ZIMBALI", "ÇİZGİLİ", "DERLEME", "SATILIK", "FARKSIZ", "SABANCI", "HASIRCI"]
 };
 
 // ===== RANK SYSTEM =====
@@ -248,109 +248,109 @@ function updateLeaderboard(playerId) {
   leaderboard.sort((a, b) => b.rankedPoints - a.rankedPoints);
   
   // Keep top 100
-  leaderboard = leaderboard.slice(0, 100);
+  if (leaderboard.length > 100) {
+    leaderboard = leaderboard.slice(0, 100);
+  }
   
   saveData();
 }
 
 function getLeaderboard() {
-  return leaderboard.slice(0, 50); // Return top 50
+  return leaderboard.slice(0, 50);
 }
 
-// ===== MATCHMAKING =====
-function tryMatchmaking() {
+function tryMatchPlayers() {
   if (queue.size < 2) return;
 
-  const [player1Id, player2Id] = Array.from(queue).slice(0, 2);
+  const queueArray = Array.from(queue);
   
-  queue.delete(player1Id);
-  queue.delete(player2Id);
+  // Simple matchmaking: take first two players
+  const player1Id = queueArray[0];
+  const player2Id = queueArray[1];
 
   const player1 = players.get(player1Id);
   const player2 = players.get(player2Id);
 
   if (!player1 || !player2) return;
 
+  // Remove from queue
+  queue.delete(player1Id);
+  queue.delete(player2Id);
+
+  // Create game
   const gameId = generateGameId();
   const wordLength = player1.preferredLength || 5;
   const targetWord = getRandomWord(wordLength);
-
-  // Coin flip to determine first player
-  const player1First = coinFlip();
-  const firstPlayerId = player1First ? player1Id : player2Id;
+  const firstPlayer = coinFlip() ? player1Id : player2Id;
 
   const game = {
-    id: gameId,
+    gameId,
     targetWord,
     wordLength,
-    maxGuesses: 12, // Total 12 guesses (6 per player initially, extends if needed)
-    currentTurn: firstPlayerId,
-    turnNumber: 0,
-    allGuesses: [], // All guesses in order
     players: {
       [player1Id]: {
-        socketId: player1Id,
         playerId: player1.playerId,
         nick: player1.nick,
-        level: player1.level,
-        rank: player1.rank,
-        rankedPoints: getPlayerData(player1.playerId).rankedPoints,
-        myGuesses: [],
+        guesses: [],
         finished: false,
         won: false
       },
       [player2Id]: {
-        socketId: player2Id,
         playerId: player2.playerId,
         nick: player2.nick,
-        level: player2.level,
-        rank: player2.rank,
-        rankedPoints: getPlayerData(player2.playerId).rankedPoints,
-        myGuesses: [],
+        guesses: [],
         finished: false,
         won: false
       }
     },
-    startTime: Date.now(),
-    status: 'active'
+    currentTurn: firstPlayer,
+    turnNumber: 0,
+    maxGuesses: 6,
+    status: 'active',
+    createdAt: Date.now(),
+    allGuesses: []
   };
 
   activeGames.set(gameId, game);
-  
-  players.get(player1Id).currentGameId = gameId;
-  players.get(player2Id).currentGameId = gameId;
+
+  player1.currentGameId = gameId;
+  player2.currentGameId = gameId;
+
+  console.log(`Game created: ${gameId} - ${player1.nick} vs ${player2.nick} - First: ${firstPlayer === player1Id ? player1.nick : player2.nick}`);
 
   // Notify both players
   io.to(player1Id).emit('game:start', {
     gameId,
-    opponent: {
-      nick: player2.nick,
-      level: player2.level,
-      rank: player2.rank,
-      rankedPoints: game.players[player2Id].rankedPoints
-    },
     wordLength,
-    yourTurn: player1First,
-    maxGuesses: game.maxGuesses
+    opponent: { nick: player2.nick, level: player2.level },
+    yourTurn: firstPlayer === player1Id
   });
 
   io.to(player2Id).emit('game:start', {
     gameId,
-    opponent: {
-      nick: player1.nick,
-      level: player1.level,
-      rank: player1.rank,
-      rankedPoints: game.players[player1Id].rankedPoints
-    },
     wordLength,
-    yourTurn: !player1First,
-    maxGuesses: game.maxGuesses
+    opponent: { nick: player1.nick, level: player1.level },
+    yourTurn: firstPlayer === player2Id
   });
 
-  console.log(`Game started: ${gameId} - ${player1.nick} vs ${player2.nick} - First: ${player1First ? player1.nick : player2.nick}`);
+  // Broadcast updated queue
+  broadcastQueueUpdate();
 }
 
-// ===== SOCKET.IO EVENTS =====
+function broadcastQueueUpdate() {
+  const queuePlayers = Array.from(queue).map(socketId => {
+    const player = players.get(socketId);
+    return player ? {
+      nick: player.nick,
+      level: player.level,
+      rank: player.rank
+    } : null;
+  }).filter(Boolean);
+
+  io.emit('queue:update', { players: queuePlayers });
+}
+
+// ===== SOCKET EVENTS =====
 io.on('connection', (socket) => {
   console.log('New connection:', socket.id);
 
@@ -358,131 +358,110 @@ io.on('connection', (socket) => {
   socket.on('player:register', (data) => {
     const { playerId, nick, level, rank, preferredLength } = data;
     
-    const actualPlayerId = playerId || socket.id;
-    const playerData = getPlayerData(actualPlayerId);
+    const storedData = getPlayerData(playerId || socket.id);
     
     players.set(socket.id, {
       socketId: socket.id,
-      playerId: actualPlayerId,
+      playerId: playerId || socket.id,
       nick: nick || 'Oyuncu',
-      level: level || playerData.level,
-      rank: rank || RANKS[playerData.level].name,
+      level: storedData.level || level || 1,
+      rank: storedData.rank || rank || 'Yeni Doğmuş I',
       preferredLength: preferredLength || 5,
-      currentGameId: null
+      currentGameId: null,
+      connectedAt: Date.now()
     });
 
     socket.emit('player:registered', {
-      playerId: actualPlayerId,
-      progress: playerData
+      playerId: playerId || socket.id,
+      progress: storedData
     });
 
-    console.log(`Player registered: ${nick} (Level ${playerData.level}, Ranked: ${playerData.rankedPoints})`);
+    console.log(`Player registered: ${nick} (${socket.id})`);
   });
 
-  // Join queue
+  // Queue management
   socket.on('queue:join', (data) => {
     const player = players.get(socket.id);
     if (!player) {
-      socket.emit('error', { message: 'Player not registered' });
+      socket.emit('error', { message: 'Önce kayıt olmalısınız!' });
       return;
     }
 
-    if (data.preferredLength) {
-      player.preferredLength = data.preferredLength;
+    if (queue.has(socket.id)) {
+      socket.emit('error', { message: 'Zaten sıradasınız!' });
+      return;
+    }
+
+    if (data.wordLength) {
+      player.preferredLength = data.wordLength;
     }
 
     queue.add(socket.id);
+    socket.emit('queue:joined', { position: queue.size });
     
-    socket.emit('queue:joined', {
-      queueSize: queue.size
-    });
-
-    Array.from(queue).forEach(playerId => {
-      const queuePlayer = players.get(playerId);
-      if (queuePlayer) {
-        io.to(playerId).emit('queue:update', {
-          queueSize: queue.size,
-          players: Array.from(queue).map(id => {
-            const p = players.get(id);
-            return p ? {
-              nick: p.nick,
-              level: p.level,
-              rank: p.rank,
-              rankedPoints: getPlayerData(p.playerId).rankedPoints
-            } : null;
-          }).filter(Boolean)
-        });
-      }
-    });
-
-    console.log(`Player joined queue: ${player.nick} (Queue size: ${queue.size})`);
-
-    tryMatchmaking();
+    console.log(`Player joined queue: ${player.nick} - Queue size: ${queue.size}`);
+    
+    broadcastQueueUpdate();
+    tryMatchPlayers();
   });
 
-  // Leave queue
   socket.on('queue:leave', () => {
     queue.delete(socket.id);
     socket.emit('queue:left');
-    console.log(`Player left queue (Queue size: ${queue.size})`);
+    broadcastQueueUpdate();
+    console.log(`Player left queue: ${socket.id} - Queue size: ${queue.size}`);
   });
 
-  // Submit guess (TURN-BASED)
+  // Game actions
   socket.on('game:guess', (data) => {
     const { gameId, guess } = data;
     const game = activeGames.get(gameId);
     
-    if (!game) {
-      socket.emit('error', { message: 'Game not found' });
+    if (!game || game.status !== 'active') {
+      socket.emit('error', { message: 'Oyun bulunamadı!' });
+      return;
+    }
+
+    // DÜZELTME: Sıra kontrolü doğru yapılıyor
+    if (game.currentTurn !== socket.id) {
+      socket.emit('error', { message: 'Senin sıran değil!' });
       return;
     }
 
     const playerData = game.players[socket.id];
-    if (!playerData) {
-      socket.emit('error', { message: 'Player not in game' });
+    if (!playerData || playerData.finished) {
+      socket.emit('error', { message: 'Bu oyunda aktif değilsiniz!' });
       return;
     }
 
-    // Check if it's player's turn
-    if (game.currentTurn !== socket.id) {
-      socket.emit('error', { message: 'Not your turn!' });
-      return;
-    }
-
-    // Validate guess
-    const targetWord = game.targetWord;
-    const result = evaluateGuess(guess.toUpperCase(), targetWord);
-    
-    const guessData = {
-      playerId: socket.id,
-      playerNick: playerData.nick,
-      word: guess.toUpperCase(),
-      result,
-      turnNumber: game.turnNumber
-    };
-
-    game.allGuesses.push(guessData);
-    playerData.myGuesses.push(guessData);
     game.turnNumber++;
+    const result = evaluateGuess(guess.toUpperCase(), game.targetWord);
+    const won = result.every(r => r === 'correct');
 
-    const won = guess.toUpperCase() === targetWord;
+    playerData.guesses.push({ guess: guess.toUpperCase(), result });
+    game.allGuesses.push({
+      player: playerData.nick,
+      guess: guess.toUpperCase(),
+      result,
+      turn: game.turnNumber
+    });
 
-    // Send result to both players
-    const opponentId = Object.keys(game.players).find(id => id !== socket.id);
-    
-    io.to(socket.id).emit('game:guess:result', {
+    // Send result to current player
+    socket.emit('game:guess:result', {
       guess: guess.toUpperCase(),
       result,
       won,
-      yourTurn: false
+      lost: false
     });
 
+    // Send opponent update
+    const opponentId = Object.keys(game.players).find(id => id !== socket.id);
     if (opponentId) {
       io.to(opponentId).emit('game:opponent:guess', {
         guess: guess.toUpperCase(),
         result,
         opponentWon: won,
-        yourTurn: !won
+        yourTurn: won ? false : true // DÜZELTME: Rakip kazandıysa sıra yok, kazanmadıysa sıra rakipte
       });
     }
 
@@ -495,18 +474,21 @@ io.on('connection', (socket) => {
     }
 
     // Check if game should continue or end in draw
-    if (game.turnNumber >= game.maxGuesses) {
+    if (game.turnNumber >= game.maxGuesses * 2) { // Her oyuncu 6 tahmin
       endGame(gameId, null); // Draw
       return;
     }
 
-    // Switch turn
+    // DÜZELTME: Sırayı doğru değiştir
     game.currentTurn = opponentId;
     
-    io.to(opponentId).emit('game:turn:start', {
-      turnNumber: game.turnNumber,
-      guessesRemaining: game.maxGuesses - game.turnNumber
-    });
+    // Rakibe sıranın geldiğini bildir
+    if (opponentId) {
+      io.to(opponentId).emit('game:turn:start', {
+        turnNumber: game.turnNumber,
+        guessesRemaining: (game.maxGuesses * 2) - game.turnNumber
+      });
+    }
   });
 
   // Get leaderboard
@@ -614,7 +596,7 @@ function endGame(gameId, winnerId = null, disconnected = false) {
       });
     } else if (isWinner) {
       // Winner
-      xpGained = 100 + (game.maxGuesses - game.turnNumber) * 10; // Bonus for quick win
+      xpGained = 100 + (game.maxGuesses - Math.floor(game.turnNumber / 2)) * 10; // Bonus for quick win
       const rankingResult = updateRankedPoints(player.playerId, game.players[opponentId].playerId, false);
       rankedChange = rankingResult.winnerChange;
       
