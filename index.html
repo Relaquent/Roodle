@@ -946,6 +946,10 @@ header {
   <div class="modal">
     <h2 id="result-title">🎉</h2>
     <p id="result-msg"></p>
+    <div id="result-answer" style="display: none; margin: 16px 0; padding: 16px; background: var(--surface3); border-radius: 12px; text-align: center;">
+      <div style="font-size: 14px; color: var(--text-muted); margin-bottom: 8px;">Doğru Kelime:</div>
+      <div style="font-size: 32px; font-weight: 900; color: var(--accent); font-family: var(--font-display); letter-spacing: 0.3em;" id="result-word"></div>
+    </div>
     <div id="result-xp" style="margin: 20px 0; padding: 20px; background: var(--surface2); border-radius: 12px; text-align: center;">
       <div style="font-size: 14px; color: var(--text-muted); margin-bottom: 8px;">XP Kazandın!</div>
       <div style="font-size: 36px; font-weight: 900; color: var(--accent); font-family: var(--font-display);" id="result-xp-amount">+50</div>
@@ -1016,6 +1020,13 @@ const RANKS = {
 for (let i = 31; i <= 100; i++) {
   RANKS[i] = { name: "Görmüş Geçirmiş", xpNeeded: RANKS[i-1].xpNeeded + 1200 };
 }
+
+const WORD_LISTS = {
+  4: ["KAPI", "SORU", "BABA", "ASLI", "ELMA", "YAZI", "KALE", "KOŞU", "BİNA", "DANA", "ARZU", "ÖYKÜ", "SÜRE", "HAVA", "KISA", "KUZU", "PARA", "MASA", "MODA", "ORAN", "KUTU", "DERE", "KEÇİ", "SAYI", "KAYI", "GİDİ", "İLKE", "KİRA", "PAŞA", "SEVİ", "UYKU", "AYNA", "BOYA", "ADAM", "ESKİ", "ANNE", "DERİ", "ÖLÇÜ", "GAGA", "HATA", "OLAY", "SENE", "ŞAKA", "İMZA", "KATI", "MEZE", "KORO", "LİSE", "SAHA", "YAPI"],
+  5: ["AKŞAM", "BALON", "CADDE", "DALGA", "ELMAS", "FENER", "GÜNEŞ", "HABER", "İNSAN", "JOKER", "KAYIK", "LIMON", "MASAL", "NEFES", "ORMAN", "PAZAR", "RADYO", "SABAH", "ŞEHİR", "TARLA", "UYGUR", "VÜCUT", "YALAN", "ZAMAN", "ABONE", "BAHAR", "CEKET", "DOLAP", "EMLAK", "FİDAN", "GURUR", "HAYAT", "ISLIK", "İÇKİT", "JETON", "KASAP", "LİSTE", "MERAK", "NODUL", "ORTAK", "PİLOT", "RAKET", "SAYFA", "ŞARKI", "TAVAN", "UZMAN", "VATAN", "YAREN", "ZİHİN"],
+  6: ["GARDOP", "KARTAL", "YARDIM", "BALKON", "GÖZLÜK", "TÜRKÇE", "MANTIK", "PİJAMA", "SÖZLÜK", "TOPRAK", "SİNCAP", "HEYKEL", "KUYRUK", "MİLYON", "ÇEYREK", "DOKTOR", "ZEYTİN", "BARDAK", "GAYRET", "MEKTUP", "FIRTIN", "KORKUŞ", "KABİNE", "RESMEN", "ŞÖVALE", "KOLTUK", "YAPRAK", "KAPTAN", "SİGARA", "GURBET", "FISTIK", "HAYVAN", "SARMAL", "BİRLİK", "EKMEKÇ", "CÜZDAN", "SULTAN", "MİKROP", "KAMYON", "DİKKAT"],
+  7: ["ANAYASA", "BELEDİYE", "ÇİSANTİ", "DİLEKÇE", "EMİRGAN", "FASULYE", "GÖKYÜZÜ", "HAKARET", "ISPANAK", "İSKELET", "JANDARMA", "KABURGA", "LOKANTA", "MERHABA", "NAKLİYE", "OKYANUS", "PENCERE", "RANDEVU", "SANDALYE", "ŞAMPUAN", "TELEFON", "UYGULAMA", "VAZİYET", "YUMURTA", "ZAFİYET", "AHTAPOT", "BAŞKENT", "CESARET", "DENEYİM", "EĞLENCE"]
+};
 
 const KB_ROWS = [
   ['E','R','T','Y','U','I','O','P','Ğ','Ü'],
@@ -1362,20 +1373,157 @@ function submitGuess() {
 
   const guess = currentGuess.join('');
 
-  if (!socket || !socket.connected) {
-    showToast('Sunucu bağlantısı yok!');
+  // Multiplayer mod
+  if (gameMode === 'multiplayer') {
+    if (!socket || !socket.connected) {
+      showToast('Sunucu bağlantısı yok!');
+      return;
+    }
+
+    if (!currentGameId) {
+      showToast('Aktif oyun yok!');
+      return;
+    }
+
+    socket.emit('game:guess', {
+      gameId: currentGameId,
+      guess: guess
+    });
     return;
   }
 
-  if (!currentGameId) {
-    showToast('Aktif oyun yok!');
+  // Single player modes (unlimited, daily)
+  if (!targetWord) {
+    showToast('Oyun başlamadı!');
     return;
   }
 
-  socket.emit('game:guess', {
-    gameId: currentGameId,
-    guess: guess
+  // Evaluate guess
+  const result = evaluateGuessLocal(guess, targetWord);
+  const won = result.every(r => r === 'correct');
+
+  // Reveal the row
+  revealRow(currentRow, guess, result, () => {
+    if (won) {
+      gameOver = true;
+      celebrateWin();
+      
+      // Calculate XP
+      const xpGained = 50 + (6 - currentRow) * 10;
+      const { playerData: updatedData, leveledUp } = updatePlayerLevelLocal(xpGained);
+      
+      setTimeout(() => {
+        showResultModalSinglePlayer({
+          result: 'win',
+          targetWord: targetWord,
+          xpGained: xpGained,
+          guessCount: currentRow + 1,
+          leveledUp: leveledUp
+        });
+      }, 1000);
+    } else if (currentRow >= 5) {
+      // Lost
+      gameOver = true;
+      disableInput();
+      
+      const xpGained = 10;
+      updatePlayerLevelLocal(xpGained);
+      
+      setTimeout(() => {
+        showResultModalSinglePlayer({
+          result: 'lose',
+          targetWord: targetWord,
+          xpGained: xpGained,
+          guessCount: 6,
+          leveledUp: false
+        });
+      }, 1000);
+    } else {
+      // Next row
+      currentRow++;
+      currentCol = 0;
+      currentGuess = [];
+    }
   });
+}
+
+// ===== LOCAL GAME EVALUATION =====
+function evaluateGuessLocal(guess, target) {
+  const result = Array(target.length).fill('absent');
+  const targetArr = target.split('');
+  const guessArr = guess.split('');
+  const targetCount = {};
+
+  targetArr.forEach(l => targetCount[l] = (targetCount[l] || 0) + 1);
+
+  for (let i = 0; i < target.length; i++) {
+    if (guessArr[i] === targetArr[i]) {
+      result[i] = 'correct';
+      targetCount[guessArr[i]]--;
+    }
+  }
+
+  for (let i = 0; i < target.length; i++) {
+    if (result[i] === 'absent' && targetCount[guessArr[i]] > 0) {
+      result[i] = 'present';
+      targetCount[guessArr[i]]--;
+    }
+  }
+
+  return result;
+}
+
+function updatePlayerLevelLocal(xpGained) {
+  playerProfile.totalXP += xpGained;
+  playerProfile.currentXP += xpGained;
+
+  let leveledUp = false;
+  while (playerProfile.level < 100) {
+    const nextRank = RANKS[playerProfile.level + 1];
+    if (playerProfile.totalXP >= nextRank.xpNeeded) {
+      playerProfile.level++;
+      playerProfile.currentXP = 0;
+      leveledUp = true;
+    } else {
+      break;
+    }
+  }
+
+  saveProfile();
+  updateProfileDisplay();
+  
+  return { playerData: playerProfile, leveledUp };
+}
+
+function showResultModalSinglePlayer(data) {
+  const modal = document.getElementById('result-modal');
+  const title = document.getElementById('result-title');
+  const msg = document.getElementById('result-msg');
+  const answerDiv = document.getElementById('result-answer');
+  const wordEl = document.getElementById('result-word');
+  const xpAmount = document.getElementById('result-xp-amount');
+
+  if (data.result === 'win') {
+    title.textContent = '🎉 KAZANDIN!';
+    msg.textContent = `${data.guessCount} tahminde buldun!`;
+    if (answerDiv) answerDiv.style.display = 'none';
+  } else {
+    title.textContent = '😔 Kaybettin';
+    msg.textContent = 'Bir sonraki sefer!';
+    if (answerDiv) answerDiv.style.display = 'block';
+    if (wordEl) wordEl.textContent = data.targetWord;
+  }
+
+  xpAmount.textContent = `+${data.xpGained || 0}`;
+  
+  if (data.leveledUp) {
+    setTimeout(() => {
+      showToast(`🎊 Seviye Atladın! ${RANKS[playerProfile.level].name}`);
+      launchConfetti();
+    }, 1000);
+  }
+
+  setTimeout(() => modal.classList.add('show'), 600);
 }
 
 // ===== REVEAL =====
@@ -1505,13 +1653,56 @@ function newGame() {
   buildKeyboard();
 }
 
+// ===== START UNLIMITED GAME =====
+function startUnlimitedGame() {
+  const list = WORD_LISTS[wordLength];
+  if (!list || list.length === 0) {
+    showToast('Bu uzunluk için kelime yok!');
+    return;
+  }
+  
+  targetWord = list[Math.floor(Math.random() * list.length)];
+  console.log('Sınırsız mod - Hedef kelime:', targetWord);
+  
+  newGame();
+  enableInput();
+  showToast('♾️ Yeni kelime başladı!');
+}
+
+// ===== START DAILY GAME =====
+function startDailyGame() {
+  const today = new Date();
+  const dayOfYear = Math.floor((today - new Date(today.getFullYear(), 0, 0)) / 1000 / 60 / 60 / 24);
+  const list = WORD_LISTS[wordLength];
+  
+  if (!list || list.length === 0) {
+    showToast('Bu uzunluk için kelime yok!');
+    return;
+  }
+  
+  // Günün kelimesi (deterministik)
+  targetWord = list[dayOfYear % list.length];
+  console.log('Günlük mod - Hedef kelime:', targetWord);
+  
+  newGame();
+  enableInput();
+  showToast('📅 Günün kelimesi başladı!');
+}
+
 document.getElementById('result-new-btn').addEventListener('click', () => {
   document.getElementById('result-modal').classList.remove('show');
-  document.getElementById('opponent-panel').style.display = 'none';
-  document.getElementById('queue-section').style.display = 'block';
-  currentGameId = null;
-  opponentData = null;
-  newGame();
+  
+  if (gameMode === 'multiplayer') {
+    document.getElementById('opponent-panel').style.display = 'none';
+    document.getElementById('queue-section').style.display = 'block';
+    currentGameId = null;
+    opponentData = null;
+    newGame();
+  } else if (gameMode === 'unlimited') {
+    startUnlimitedGame();
+  } else if (gameMode === 'daily') {
+    startDailyGame();
+  }
 });
 
 // ===== PROFILE MODAL =====
@@ -1595,6 +1786,41 @@ document.querySelectorAll('.wl-btn').forEach(btn => {
     wordLength = len;
     
     showToast(`${len} harfli kelimeler seçildi`);
+    
+    // Sınırsız modda otomatik yeni oyun başlat
+    if (gameMode === 'unlimited') {
+      startUnlimitedGame();
+    }
+  });
+});
+
+// ===== MODE SELECTOR =====
+document.querySelectorAll('.mode-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const mode = btn.dataset.mode;
+    if (mode === gameMode) return;
+    
+    document.querySelectorAll('.mode-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    gameMode = mode;
+    
+    // Mod değiştiğinde UI güncelle
+    if (mode === 'multiplayer') {
+      document.getElementById('queue-section').style.display = 'block';
+      document.getElementById('opponent-panel').style.display = 'none';
+      showToast('⚔️ 1v1 modu seçildi');
+      newGame();
+    } else if (mode === 'unlimited') {
+      document.getElementById('queue-section').style.display = 'none';
+      document.getElementById('opponent-panel').style.display = 'none';
+      showToast('♾️ Sınırsız mod seçildi');
+      startUnlimitedGame();
+    } else if (mode === 'daily') {
+      document.getElementById('queue-section').style.display = 'none';
+      document.getElementById('opponent-panel').style.display = 'none';
+      showToast('📅 Günlük mod seçildi');
+      startDailyGame();
+    }
   });
 });
 
