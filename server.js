@@ -2,6 +2,8 @@ const express = require('express');
 const http = require('http');
 const socketIO = require('socket.io');
 const cors = require('cors');
+const fs = require('fs');
+const path = require('path');
 require('dotenv').config();
 
 const app = express();
@@ -17,18 +19,60 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
+// ===== PERSISTENT STORAGE =====
+const DATA_DIR = path.join(__dirname, 'data');
+const PLAYERS_FILE = path.join(DATA_DIR, 'players.json');
+const LEADERBOARD_FILE = path.join(DATA_DIR, 'leaderboard.json');
+
+// Create data directory if it doesn't exist
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+
+// Load or initialize data
+let persistentPlayers = {};
+let leaderboard = [];
+
+function loadData() {
+  try {
+    if (fs.existsSync(PLAYERS_FILE)) {
+      persistentPlayers = JSON.parse(fs.readFileSync(PLAYERS_FILE, 'utf8'));
+    }
+    if (fs.existsSync(LEADERBOARD_FILE)) {
+      leaderboard = JSON.parse(fs.readFileSync(LEADERBOARD_FILE, 'utf8'));
+    }
+    console.log('Data loaded successfully');
+  } catch (error) {
+    console.error('Error loading data:', error);
+  }
+}
+
+function saveData() {
+  try {
+    fs.writeFileSync(PLAYERS_FILE, JSON.stringify(persistentPlayers, null, 2));
+    fs.writeFileSync(LEADERBOARD_FILE, JSON.stringify(leaderboard, null, 2));
+  } catch (error) {
+    console.error('Error saving data:', error);
+  }
+}
+
+// Save data periodically
+setInterval(saveData, 30000); // Every 30 seconds
+
+// Load data on startup
+loadData();
+
 // ===== GAME STATE =====
 const players = new Map(); // socketId -> player data
 const queue = new Set(); // waiting players
 const activeGames = new Map(); // gameId -> game data
-const playerProgress = new Map(); // playerId -> progress data
 
 // ===== WORD LISTS =====
 const WORD_LISTS = {
-  4: ["KAPI", "SORU", "BABA", "ASLI", "ELMA", "YAZI", "KALE", "KOŞU", "BİNA", "DANA", "ARZU", "ÖYKÜ", "SÜRE", "HAVA", "KISA", "KUZU", "PARA", "MASA", "MODA", "ORAN", "KUTU", "DERE", "KEÇİ", "SAYI", "KAYI", "GİDİ", "İLKE", "KİRA", "PAŞA", "SEVİ", "UYKU", "AYNA", "BOYA", "ADAM", "ESKİ", "ANNE", "DERİ", "ÖLÇÜ", "GAGA", "HATA", "OLAY", "SENE", "ŞAKA", "İMZA", "KATI", "MEZE", "KORO", "LİSE", "SAHA", "YAPI", "KURS", "GURU", "TAKI", "KOZA", "ARTI", "DURU", "FARE", "YARI", "ÖDÜL", "AYAK", "HOCA", "ALAN", "ÇARE", "KARI", "EŞYA", "İLAÇ", "MAŞA", "KULE", "OVAL", "SIRA", "FOTO", "YÜZÜ", "BATI", "DOĞU", "KÜRE", "ASKI", "ÇENE", "DİZİ", "KOLA", "GECE", "CİNS", "ARPA", "SOPA", "İLİK", "MÜZE", "SİTE", "ÜLKE", "CADI", "LİRA", "GÜCÜ", "EKİN", "ADET", "VALE", "ÇATI", "AYIP", "BORÇ", "KAFE", "DERS", "ÖZEL", "KARA", "İSİM", "HAYI", "ÇITA", "KİLO", "BUSE", "ÖREN", "AMİR", "EKİM", "DANA", "ZARF", "TAHT", "İĞNE", "ÇİVİ", "EĞRİ", "KART", "KAYA", "İMHA", "EKOZ", "HİBE", "VALİ", "İCAT", "LİMAN", "KREP", "KAZA", "İNCE", "KÖŞE", "AKIL", "AYAR", "BONE", "DÜZE", "İCRA", "KIRA", "SEDA", "BÜRO", "SÖZÜ", "ŞİİR", "AVCI", "SİLO", "BANT", "KOTA", "MİNA", "CİLT", "İRAN", "FİRE", "FİDE", "ÖNCÜ", "OKUL", "ADIM", "AZIK", "DİLİ", "KAZI", "AKIM", "EŞİK", "AZİZ", "KORO", "ALAY", "GİŞE", "ŞİLE", "ÖDEM", "SİHİ", "EĞİM", "ÇİFT", "BORU", "SULU", "KATI", "BİRE", "KÜFE", "DÜET", "ALET", "MİNE", "İDOL", "İKNA", "İDRA", "KİRE", "KELE", "KÖYÜ", "RİSK", "SİRK", "TAZE", "TAPU", "TEPE", "VİZE", "YEDİ", "ZAMİ", "ÖDÜN", "YARA", "TANI", "KORU", "ERİM", "OLTA", "SOBA", "SAPA", "DOKU", "KEŞF", "ÜMİT", "GÖZE", "FAİZ", "BALE", "KOYU", "İNCİ", "GİZİ", "KATI", "ORSA"],
-  5: ["AKŞAM", "BALON", "CADDE", "DALGA", "ELMAS", "FENER", "GÜNEŞ", "HABER", "İNSAN", "JOKER", "KAYIK", "LIMON", "MASAL", "NEFES", "ORMAN", "PAZAR", "RADYO", "SABAH", "ŞEHİR", "TARLA", "UYGUR", "VÜCUT", "YALAN", "ZAMAN", "ABONE", "BAHAR", "CEKET", "DOLAP", "EMLAK", "FİDAN", "GURUR", "HAYAT", "ISLIK", "İÇKİT", "JETON", "KASAP", "LİSTE", "MERAK", "NODUL", "ORTAK", "PİLOT", "RAKET", "SAYFA", "ŞARKI", "TAVAN", "UZMAN", "VATAN", "YAREN", "ZİHİN", "ACELE", "BALIK", "CİHAN", "DEMİR", "EGZOZ", "FATUR", "GÖLGE", "HUKUK", "ILGAZ", "İPUCU", "JİLET", "KAVUN", "LEVHA", "MİRAS", "NAKIŞ", "ORHAN", "PARÇA", "REÇEL", "SOLUK", "ŞEKER", "TABLO", "UÇKUN", "VALİZ", "YALIN", "ZORLU", "ADRES", "BÖLGE", "CÜMLE", "DÜNYA", "EŞARP", "FIRÇA", "GÖREV", "HESAP", "IŞIMA", "İNKAR", "KABLO", "LOKMA", "MÜZİK", "NİMET", "OPERA", "PEDAL", "ROKET", "SEPET", "ŞÖYLE", "TÜFEK", "UYARI", "VAKIF", "YALDI", "ZİRAİ", "AHLAK", "BELGE", "CEVAP", "DİREK", "ERKEK", "FİYAT", "GÖRÜŞ", "HUZUR", "ASLAN", "İSKEÇ", "KADER", "LAZIM", "METRO", "NESİL", "ORİJİN", "PROJE", "ROMAN", "SÜREÇ", "ŞAHIS", "TEKİN", "UMUTL", "VOTKA", "YAZAR", "ZARAR", "ALTIN", "BÖREK", "CESUR", "DÜĞÜN", "EVRAK", "FLAMA", "GÜVEN", "HİSSE", "IDDI", "İZMİR", "KİTAP", "LİMAN", "MODEL", "NOKTA", "OTİZM", "PAMUK", "REHİN", "SİLAH", "ŞERİT", "TURŞU", "UÇMAK", "VAKİT", "YEMEK", "ZİNCİ", "ANTEN", "BEYAZ", "CAMIZ", "DÜŞÜŞ", "EKSİK", "FORMA", "GÜZEL", "HELVA", "IŞIMA", "İHRAÇ", "KAVGA", "LİSAN", "MADDE", "NAZAR", "OYNAN", "PASTA", "REJİM", "SINAV", "ŞURUP", "TAŞIT", "UYGAR", "VİLLA", "YARIŞ", "ZEBRA", "AYRAN", "BİLET", "CİHAZ", "DURAK", "EYLEM", "FİNAL", "GELİN", "HAKİM", "ISSIZ", "İNCİR", "KAYIP", "LİMİT", "MESAJ", "NİSAN", "ORGAN", "PENYE", "REKOR", "SİVRİ", "ŞÜPHE", "TEPSİ", "UZAYI", "VİRAJ", "YÜZEY", "ZALİM", "ARABA", "BARIŞ", "COŞKU", "DENİZ", "ERKEN", "FESAT", "KAFİR", "HALEF", "ITRAK", "İLHAK", "KARGO", "LAKAP", "MEYVE", "NİÇİN", "OKUMA", "PLAKA", "RADAR", "SAYGI", "ŞOFÖR", "TAVŞA", "UÇKUN", "VURGU", "YAKIN", "ZAMLI"],
-  6: ["GARDOP", "KARTAL", "YARDIM", "BALKON", "GÖZLÜK", "TÜRKÇE", "MANTIK", "PİJAMA", "SÖZLÜK", "TOPRAK", "SİNCAP", "HEYKEL", "KUYRUK", "MİLYON", "ÇEYREK", "DOKTOR", "ZEYTİN", "BARDAK", "GAYRET", "MEKTUP", "FIRTIN", "KORKUŞ", "KABİNE", "RESMEN", "ŞÖVALE", "KOLTUK", "YAPRAK", "KAPTAN", "SİGARA", "GURBET", "FISTIK", "HAYVAN", "SARMAL", "BİRLİK", "EKMEKÇ", "CÜZDAN", "SULTAN", "MİKROP", "KAMYON", "DİKKAT", "ŞEFFAF", "VİCDAN", "BAYRAM", "İSTİFA", "KAYNAK", "ADALET", "MUTFAK", "ŞEMSİYE", "TABİAT", "HAYRET", "MÜHÜRL", "DESTAN", "PİKNİK", "KAYKAY", "TAVŞAN", "KONSER", "PİŞMAN", "SAĞLIK", "BİSKEÇ", "MERCAN", "KUDRET", "KISMET", "LASTİK", "NAFAKA", "GAZETE", "MERKEZ", "FELSEF", "KIYMET", "YILDIZ", "SULHÇU", "KEPÇEÇ", "ZAHMET", "TERMİS", "MEYDAN", "ŞAHANE", "İBADET", "KUVVET", "HASRET", "BİRLİK", "VİTRİN", "SİYASET", "KARPUZ", "SİSİLY", "MİSÜLÜ", "KÜLTÜR", "PERDEY", "DİRSEK", "DURDUR", "KAYGAN", "İŞARET", "PARMAK", "TİMSAH", "ŞARJÖR", "MİSAİR", "BOYNUZ", "HORTUM", "SANDAL", "FİLİSİ", "KAYISI", "MAHKUM", "TEKNİK", "YEMİNL", "SİİRTİ", "KİMLİK", "KONTAK", "CÖMERT", "HÜCİRE", "TERLİK", "SİSTEM", "PORSEN", "KUMSAL", "YÜZÜCÜ", "SARMAL", "KAYKAY", "SİRKET", "DİREKÇ", "KİSVEL", "KAYNAŞ", "GÖRSEL", "KAZANÇ", "FİZİKİ", "İHANET", "SIRDAŞ", "BÜLBÜL", "KABARE", "SERVİS", "İSKELE", "KÖPRÜS", "BASKIN", "GÜNCEL", "YALÇIN", "MECLİS", "KORUMA", "KIBRIS", "SİRİKE", "TASARI", "KEŞKEK", "GÜLMEK", "İMKANI", "TÜCCAR", "MASRAF", "HEYBET", "PİRİNÇ", "ŞÖHRET", "TEKLİF", "KÜSMEK", "YAKAMO", "FERSAH", "İSTEKİ", "BİLYAÇ", "KUNDUZ", "KASTEN", "TEMSİL", "KAYNAK", "KOSTÜM", "HESABI", "FESLEĞ", "GERÇEK", "MODERN", "KIYAFE", "KEMANE", "DİNGİL", "BİTKİS", "SÜRGÜN", "İHRACAT", "YALDIZ", "TAKVİM", "TUNCEL", "SAYDAM", "KURŞUN", "SÜSLEM", "TERHİS", "VARLIK", "YANDAŞ", "KORNET", "GÜNCEL", "HAYDİÇ", "KUMPAS", "MİNDER", "SÜREKL", "KIŞLIK", "ŞİMDİK", "GURBET", "FIRTIN", "KABİLE", "İSABET", "KAYGIN", "DÜELLO", "MERHEM", "SABIKA", "TAKDİM", "BİTİRİ", "DÖNEMEÇ", "HEYCANLI", "ŞELALE", "ZALİMİ", "KAVRAM", "KOŞULU", "ZİGZAG"],
-  7: ["ANAYASA", "BELEDİYE", "ÇİSANTİ", "DİLEKÇE", "EMİRGAN", "FASULYE", "GÖKYÜZÜ", "HAKARET", "ISPANAK", "İSKELET", "JANDARMA", "KABURGA", "LOKANTA", "MERHABA", "NAKLİYE", "OKYANUS", "PENCERE", "RANDEVU", "SANDALYE", "ŞAMPUAN", "TELEFON", "UYGULAMA", "VAZİYET", "YUMURTA", "ZAFİYET", "AHTAPOT", "BAŞKENT", "CESARET", "DENEYİM", "EĞLENCE", "FABRİKA", "GÖSTERİ", "HASTANE", "IHLAMUR", "İSTİDAT", "KAVANOZ", "LAVANTA", "MİSAFİR", "NUMARAL", "OYUNCU", "PIRLANTA", "REFAHAT", "SAYGILI", "ŞAŞIRMA", "TİYATRO", "UZUNLUK", "VERİMLİ", "YETENEK", "ZORUNLU", "AMBALAJ", "BERABER", "COĞRAFA", "DÜŞÜNCE", "EMNİYET", "FESTİVAL", "GÖRÜNTÜ", "HAYSİYET", "ISIRGAN", "İLGİNÇTİ", "KAZANIM", "LEVREKL", "MUTLULU", "NAMUSLU", "OTOMATİK", "PANAYIR", "REKABET", "SİNEMACI", "ŞAKAYIK", "TEMİZLİK", "UZMANLA", "VALİZLE", "YAZILIM", "ZENGİNL", "AKTARIM", "BİSİKLET", "ÇERÇEVE", "DEĞİRMEN", "EFSANEVİ", "FELAKET", "GİRİŞİM", "HAYALET", "ISMARLA", "İMTİHAN", "KARANFİL", "LİMONATA", "MALİYET", "NİŞASTA", "OKSİJEN", "PERŞEMBE", "SAMİMİYET", "ŞEHİRLİ", "TARTIŞMA", "ÜRETİCİ", "VARİSÇİ", "YIKILMA", "ZABITALA", "ANLAYIŞ", "BAĞLAMA", "CEPHANE", "DÜZENLİ", "EKSİKLİK", "FERAHLIK", "GÖREVLİ", "HAREKET", "IŞILDAK", "İÇECEKLİ", "KONTROL", "LÜBEYYE", "MİLYARD", "NEZAKET", "ORDUEVİ", "PATATES", "REÇETELİ", "SÜREKLİ", "ŞİKAYET", "TOPLANTI", "ÜZÜNTÜLÜ", "VİCDANLI", "YÖNETİM", "ZÜMRÜT", "ALTYAPI", "BULANIK", "CÖMERTLİK", "DÜZELTME", "ELBİSELİ", "FAALİYET", "GÜNEŞLİ", "HAZİNEM", "İLANLAR", "KÜLTÜRLÜ", "MADALYA", "NİTELİK", "OYUNCAK", "PORSİYON", "REHBERLİK", "SEVİYELİ", "ŞAHSİYET", "TAMİRAT", "UYARICI", "VAKİTLİ", "YARATIK", "ZİYARET", "ASİSTAN", "BÖLGESEL", "ÇALIŞKAN", "DİNAMİK", "EĞİTMEN", "FOTOĞRAF", "GÖREVDE", "HAVADİS", "ISIRMAK", "İLETİŞİM", "KAPTANLI", "LAVABOLU", "MANTARLI", "NÖBETÇİ", "OTURMAK", "PARLAMA", "REKORCU", "SATIŞLAR", "ŞAŞIRTMA", "TASARIM", "ÜYELİKLER", "VALİZLER", "YAZILIM", "ZAMANDA", "AVUKATLIK", "BİLDİRİM", "ÇEVRECİ", "DİKKATLİ", "EKİPMAN", "FIKRAAN", "GÜLERİZ", "HAYIRLI", "İSABETLİ", "KAPASİTE", "LAHMACUN", "MERİNOS", "NUMARALI", "ORMANCI", "PANDÜL", "SESSİZLİK", "TECRÜBE", "VİRGÜLLÜ", "YETKİLİ", "ZIMBALI", "ÇİZGİLİ", "DERLEME", "SATILIK", "FARKSIZ", "SABANCI", "HASIRCI"]
+  4: ["KAPI", "SORU", "BABA", "ASLI", "ELMA", "YAZI", "KALE", "KOŞU", "BİNA", "DANA", "ARZU", "ÖYKÜ", "SÜRE", "HAVA", "KISA", "KUZU", "PARA", "MASA", "MODA", "ORAN", "KUTU", "DERE", "KEÇİ", "SAYI", "KAYI", "GİDİ", "İLKE", "KİRA", "PAŞA", "SEVİ", "UYKU", "AYNA", "BOYA", "ADAM", "ESKİ", "ANNE", "DERİ", "ÖLÇÜ", "GAGA", "HATA", "OLAY", "SENE", "ŞAKA", "İMZA", "KATI", "MEZE", "KORO", "LİSE", "SAHA", "YAPI"],
+  5: ["AKŞAM", "BALON", "CADDE", "DALGA", "ELMAS", "FENER", "GÜNEŞ", "HABER", "İNSAN", "JOKER", "KAYIK", "LIMON", "MASAL", "NEFES", "ORMAN", "PAZAR", "RADYO", "SABAH", "ŞEHİR", "TARLA", "UYGUR", "VÜCUT", "YALAN", "ZAMAN", "ABONE", "BAHAR", "CEKET", "DOLAP", "EMLAK", "FİDAN", "GURUR", "HAYAT", "ISLIK", "İÇKİT", "JETON", "KASAP", "LİSTE", "MERAK", "NODUL", "ORTAK", "PİLOT", "RAKET", "SAYFA", "ŞARKI", "TAVAN", "UZMAN", "VATAN", "YAREN", "ZİHİN"],
+  6: ["GARDOP", "KARTAL", "YARDIM", "BALKON", "GÖZLÜK", "TÜRKÇE", "MANTIK", "PİJAMA", "SÖZLÜK", "TOPRAK", "SİNCAP", "HEYKEL", "KUYRUK", "MİLYON", "ÇEYREK", "DOKTOR", "ZEYTİN", "BARDAK", "GAYRET", "MEKTUP", "FIRTIN", "KORKUŞ", "KABİNE", "RESMEN", "ŞÖVALE", "KOLTUK", "YAPRAK", "KAPTAN", "SİGARA", "GURBET", "FISTIK", "HAYVAN", "SARMAL", "BİRLİK", "EKMEKÇ", "CÜZDAN", "SULTAN", "MİKROP", "KAMYON", "DİKKAT"],
+  7: ["ANAYASA", "BELEDİYE", "ÇİSANTİ", "DİLEKÇE", "EMİRGAN", "FASULYE", "GÖKYÜZÜ", "HAKARET", "ISPANAK", "İSKELET", "JANDARMA", "KABURGA", "LOKANTA", "MERHABA", "NAKLİYE", "OKYANUS", "PENCERE", "RANDEVU", "SANDALYE", "ŞAMPUAN", "TELEFON", "UYGULAMA", "VAZİYET", "YUMURTA", "ZAFİYET", "AHTAPOT", "BAŞKENT", "CESARET", "DENEYİM", "EĞLENCE"]
 };
 
 // ===== RANK SYSTEM =====
@@ -65,7 +109,6 @@ const RANKS = {
   30: { name: "Görmüş Geçirmiş", xpNeeded: 10500 }
 };
 
-// Generate ranks up to level 100
 for (let i = 31; i <= 100; i++) {
   RANKS[i] = { name: "Görmüş Geçirmiş", xpNeeded: RANKS[i-1].xpNeeded + 1200 };
 }
@@ -80,61 +123,138 @@ function generateGameId() {
   return `game_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
 
-function calculateXP(won, guessCount) {
-  if (!won) return 10; // Participation XP
-  
-  let baseXP = 50;
-  const bonuses = {
-    1: 100,
-    2: 75,
-    3: 50,
-    4: 30,
-    5: 20,
-    6: 10
-  };
-  
-  return baseXP + (bonuses[guessCount] || 0);
+function coinFlip() {
+  return Math.random() < 0.5;
+}
+
+function getPlayerData(playerId) {
+  if (!persistentPlayers[playerId]) {
+    persistentPlayers[playerId] = {
+      playerId,
+      totalXP: 0,
+      level: 1,
+      currentXP: 0,
+      wins: 0,
+      losses: 0,
+      draws: 0,
+      gamesPlayed: 0,
+      rankedPoints: 1000, // Starting ELO-like rating
+      highestRank: 1000,
+      winStreak: 0,
+      bestWinStreak: 0
+    };
+  }
+  return persistentPlayers[playerId];
 }
 
 function updatePlayerLevel(playerId, xpGained) {
-  let progress = playerProgress.get(playerId) || {
-    totalXP: 0,
-    level: 1,
-    currentXP: 0,
-    wins: 0,
-    losses: 0,
-    gamesPlayed: 0
-  };
+  let playerData = getPlayerData(playerId);
 
-  progress.totalXP += xpGained;
-  progress.currentXP += xpGained;
+  playerData.totalXP += xpGained;
+  playerData.currentXP += xpGained;
 
-  // Check for level up
   let leveledUp = false;
-  while (progress.level < 100) {
-    const nextRank = RANKS[progress.level + 1];
-    if (progress.totalXP >= nextRank.xpNeeded) {
-      progress.level++;
-      progress.currentXP = 0;
+  while (playerData.level < 100) {
+    const nextRank = RANKS[playerData.level + 1];
+    if (playerData.totalXP >= nextRank.xpNeeded) {
+      playerData.level++;
+      playerData.currentXP = 0;
       leveledUp = true;
     } else {
       break;
     }
   }
 
-  playerProgress.set(playerId, progress);
-  return { progress, leveledUp };
+  persistentPlayers[playerId] = playerData;
+  saveData();
+  
+  return { playerData, leveledUp };
 }
 
-function getPlayerProgress(playerId) {
-  return playerProgress.get(playerId) || {
-    totalXP: 0,
-    level: 1,
-    currentXP: 0,
-    wins: 0,
-    losses: 0,
-    gamesPlayed: 0
+function updateRankedPoints(winner, loser, isDraw = false) {
+  const winnerData = getPlayerData(winner);
+  const loserData = getPlayerData(loser);
+
+  const K = 32; // K-factor for ELO
+  const expectedWinner = 1 / (1 + Math.pow(10, (loserData.rankedPoints - winnerData.rankedPoints) / 400));
+  const expectedLoser = 1 / (1 + Math.pow(10, (winnerData.rankedPoints - loserData.rankedPoints) / 400));
+
+  if (isDraw) {
+    winnerData.rankedPoints += Math.round(K * (0.5 - expectedWinner));
+    loserData.rankedPoints += Math.round(K * (0.5 - expectedLoser));
+    winnerData.draws++;
+    loserData.draws++;
+  } else {
+    const winnerChange = Math.round(K * (1 - expectedWinner));
+    const loserChange = Math.round(K * (0 - expectedLoser));
+    
+    winnerData.rankedPoints += winnerChange;
+    loserData.rankedPoints += loserChange;
+    
+    winnerData.wins++;
+    winnerData.winStreak++;
+    winnerData.bestWinStreak = Math.max(winnerData.bestWinStreak, winnerData.winStreak);
+    
+    loserData.losses++;
+    loserData.winStreak = 0;
+  }
+
+  winnerData.highestRank = Math.max(winnerData.highestRank, winnerData.rankedPoints);
+  loserData.highestRank = Math.max(loserData.highestRank, loserData.rankedPoints);
+
+  winnerData.gamesPlayed++;
+  loserData.gamesPlayed++;
+
+  persistentPlayers[winner] = winnerData;
+  persistentPlayers[loser] = loserData;
+  
+  updateLeaderboard(winner);
+  updateLeaderboard(loser);
+  
+  saveData();
+
+  return {
+    winnerPoints: winnerData.rankedPoints,
+    loserPoints: loserData.rankedPoints,
+    winnerChange: isDraw ? Math.round(K * (0.5 - expectedWinner)) : Math.round(K * (1 - expectedWinner)),
+    loserChange: isDraw ? Math.round(K * (0.5 - expectedLoser)) : Math.round(K * (0 - expectedLoser))
   };
+}
+
+function updateLeaderboard(playerId) {
+  const playerData = getPlayerData(playerId);
+  
+  const existingIndex = leaderboard.findIndex(p => p.playerId === playerId);
+  
+  const leaderboardEntry = {
+    playerId: playerData.playerId,
+    nick: players.get(Object.keys(players).find(k => players.get(k)?.playerId === playerId))?.nick || 'Oyuncu',
+    rankedPoints: playerData.rankedPoints,
+    level: playerData.level,
+    wins: playerData.wins,
+    losses: playerData.losses,
+    draws: playerData.draws,
+    gamesPlayed: playerData.gamesPlayed,
+    winStreak: playerData.winStreak
+  };
+
+  if (existingIndex >= 0) {
+    leaderboard[existingIndex] = leaderboardEntry;
+  } else {
+    leaderboard.push(leaderboardEntry);
+  }
+
+  // Sort by ranked points
+  leaderboard.sort((a, b) => b.rankedPoints - a.rankedPoints);
+  
+  // Keep top 100
+  leaderboard = leaderboard.slice(0, 100);
+  
+  saveData();
+}
+
+function getLeaderboard() {
+  return leaderboard.slice(0, 50); // Return top 50
 }
 
 // ===== MATCHMAKING =====
@@ -155,8 +275,18 @@ function tryMatchmaking() {
   const wordLength = player1.preferredLength || 5;
   const targetWord = getRandomWord(wordLength);
 
+  // Coin flip to determine first player
+  const player1First = coinFlip();
+  const firstPlayerId = player1First ? player1Id : player2Id;
+
   const game = {
     id: gameId,
+    targetWord,
+    wordLength,
+    maxGuesses: 12, // Total 12 guesses (6 per player initially, extends if needed)
+    currentTurn: firstPlayerId,
+    turnNumber: 0,
+    allGuesses: [], // All guesses in order
     players: {
       [player1Id]: {
         socketId: player1Id,
@@ -164,11 +294,10 @@ function tryMatchmaking() {
         nick: player1.nick,
         level: player1.level,
         rank: player1.rank,
-        guesses: [],
-        currentGuess: 0,
+        rankedPoints: getPlayerData(player1.playerId).rankedPoints,
+        myGuesses: [],
         finished: false,
-        won: false,
-        guessCount: 0
+        won: false
       },
       [player2Id]: {
         socketId: player2Id,
@@ -176,15 +305,12 @@ function tryMatchmaking() {
         nick: player2.nick,
         level: player2.level,
         rank: player2.rank,
-        guesses: [],
-        currentGuess: 0,
+        rankedPoints: getPlayerData(player2.playerId).rankedPoints,
+        myGuesses: [],
         finished: false,
-        won: false,
-        guessCount: 0
+        won: false
       }
     },
-    targetWord,
-    wordLength,
     startTime: Date.now(),
     status: 'active'
   };
@@ -200,9 +326,12 @@ function tryMatchmaking() {
     opponent: {
       nick: player2.nick,
       level: player2.level,
-      rank: player2.rank
+      rank: player2.rank,
+      rankedPoints: game.players[player2Id].rankedPoints
     },
-    wordLength
+    wordLength,
+    yourTurn: player1First,
+    maxGuesses: game.maxGuesses
   });
 
   io.to(player2Id).emit('game:start', {
@@ -210,12 +339,15 @@ function tryMatchmaking() {
     opponent: {
       nick: player1.nick,
       level: player1.level,
-      rank: player1.rank
+      rank: player1.rank,
+      rankedPoints: game.players[player1Id].rankedPoints
     },
-    wordLength
+    wordLength,
+    yourTurn: !player1First,
+    maxGuesses: game.maxGuesses
   });
 
-  console.log(`Game started: ${gameId} - ${player1.nick} vs ${player2.nick}`);
+  console.log(`Game started: ${gameId} - ${player1.nick} vs ${player2.nick} - First: ${player1First ? player1.nick : player2.nick}`);
 }
 
 // ===== SOCKET.IO EVENTS =====
@@ -226,25 +358,25 @@ io.on('connection', (socket) => {
   socket.on('player:register', (data) => {
     const { playerId, nick, level, rank, preferredLength } = data;
     
+    const actualPlayerId = playerId || socket.id;
+    const playerData = getPlayerData(actualPlayerId);
+    
     players.set(socket.id, {
       socketId: socket.id,
-      playerId: playerId || socket.id,
+      playerId: actualPlayerId,
       nick: nick || 'Oyuncu',
-      level: level || 1,
-      rank: rank || 'Yeni Doğmuş I',
+      level: level || playerData.level,
+      rank: rank || RANKS[playerData.level].name,
       preferredLength: preferredLength || 5,
       currentGameId: null
     });
 
-    // Load player progress
-    const progress = getPlayerProgress(playerId || socket.id);
-    
     socket.emit('player:registered', {
-      playerId: playerId || socket.id,
-      progress
+      playerId: actualPlayerId,
+      progress: playerData
     });
 
-    console.log(`Player registered: ${nick} (Level ${level})`);
+    console.log(`Player registered: ${nick} (Level ${playerData.level}, Ranked: ${playerData.rankedPoints})`);
   });
 
   // Join queue
@@ -265,7 +397,6 @@ io.on('connection', (socket) => {
       queueSize: queue.size
     });
 
-    // Broadcast queue update to all waiting players
     Array.from(queue).forEach(playerId => {
       const queuePlayer = players.get(playerId);
       if (queuePlayer) {
@@ -276,7 +407,8 @@ io.on('connection', (socket) => {
             return p ? {
               nick: p.nick,
               level: p.level,
-              rank: p.rank
+              rank: p.rank,
+              rankedPoints: getPlayerData(p.playerId).rankedPoints
             } : null;
           }).filter(Boolean)
         });
@@ -285,7 +417,6 @@ io.on('connection', (socket) => {
 
     console.log(`Player joined queue: ${player.nick} (Queue size: ${queue.size})`);
 
-    // Try matchmaking
     tryMatchmaking();
   });
 
@@ -296,7 +427,7 @@ io.on('connection', (socket) => {
     console.log(`Player left queue (Queue size: ${queue.size})`);
   });
 
-  // Submit guess
+  // Submit guess (TURN-BASED)
   socket.on('game:guess', (data) => {
     const { gameId, guess } = data;
     const game = activeGames.get(gameId);
@@ -312,8 +443,9 @@ io.on('connection', (socket) => {
       return;
     }
 
-    if (playerData.finished) {
-      socket.emit('error', { message: 'Already finished' });
+    // Check if it's player's turn
+    if (game.currentTurn !== socket.id) {
+      socket.emit('error', { message: 'Not your turn!' });
       return;
     }
 
@@ -321,50 +453,73 @@ io.on('connection', (socket) => {
     const targetWord = game.targetWord;
     const result = evaluateGuess(guess.toUpperCase(), targetWord);
     
-    playerData.guesses.push({
+    const guessData = {
+      playerId: socket.id,
+      playerNick: playerData.nick,
       word: guess.toUpperCase(),
-      result
-    });
-    playerData.currentGuess++;
+      result,
+      turnNumber: game.turnNumber
+    };
+
+    game.allGuesses.push(guessData);
+    playerData.myGuesses.push(guessData);
+    game.turnNumber++;
 
     const won = guess.toUpperCase() === targetWord;
-    const lost = playerData.currentGuess >= 6 && !won;
 
-    if (won || lost) {
-      playerData.finished = true;
-      playerData.won = won;
-      playerData.guessCount = playerData.currentGuess;
-    }
-
-    // Send result to player
-    socket.emit('game:guess:result', {
+    // Send result to both players
+    const opponentId = Object.keys(game.players).find(id => id !== socket.id);
+    
+    io.to(socket.id).emit('game:guess:result', {
       guess: guess.toUpperCase(),
       result,
       won,
-      lost
+      yourTurn: false
     });
 
-    // Send opponent update
-    const opponentId = Object.keys(game.players).find(id => id !== socket.id);
     if (opponentId) {
-      io.to(opponentId).emit('game:opponent:update', {
-        guessCount: playerData.currentGuess,
-        finished: playerData.finished,
-        won: playerData.won
+      io.to(opponentId).emit('game:opponent:guess', {
+        guess: guess.toUpperCase(),
+        result,
+        opponentWon: won,
+        yourTurn: !won
       });
     }
 
-    // Check if game is over
-    const allFinished = Object.values(game.players).every(p => p.finished);
-    if (allFinished) {
-      endGame(gameId);
+    // Check win condition
+    if (won) {
+      playerData.finished = true;
+      playerData.won = true;
+      endGame(gameId, socket.id);
+      return;
     }
+
+    // Check if game should continue or end in draw
+    if (game.turnNumber >= game.maxGuesses) {
+      endGame(gameId, null); // Draw
+      return;
+    }
+
+    // Switch turn
+    game.currentTurn = opponentId;
+    
+    io.to(opponentId).emit('game:turn:start', {
+      turnNumber: game.turnNumber,
+      guessesRemaining: game.maxGuesses - game.turnNumber
+    });
+  });
+
+  // Get leaderboard
+  socket.on('leaderboard:get', () => {
+    socket.emit('leaderboard:update', {
+      leaderboard: getLeaderboard()
+    });
   });
 
   // Request progress
   socket.on('player:progress:get', (data) => {
     const playerId = data.playerId || socket.id;
-    const progress = getPlayerProgress(playerId);
+    const progress = getPlayerData(playerId);
     socket.emit('player:progress:update', { progress });
   });
 
@@ -375,31 +530,13 @@ io.on('connection', (socket) => {
     const player = players.get(socket.id);
     if (player && player.currentGameId) {
       const game = activeGames.get(player.currentGameId);
-      if (game) {
-        // Notify opponent
+      if (game && game.status === 'active') {
         const opponentId = Object.keys(game.players).find(id => id !== socket.id);
         if (opponentId) {
           io.to(opponentId).emit('game:opponent:disconnected');
           
           // Award win to opponent
-          const opponentPlayer = game.players[opponentId];
-          const opponentData = players.get(opponentId);
-          
-          if (opponentPlayer && opponentData) {
-            const xpGained = calculateXP(true, opponentPlayer.currentGuess || 1);
-            const { progress, leveledUp } = updatePlayerLevel(opponentData.playerId, xpGained);
-            progress.wins++;
-            progress.gamesPlayed++;
-            playerProgress.set(opponentData.playerId, progress);
-
-            io.to(opponentId).emit('game:end', {
-              result: 'win',
-              reason: 'opponent_disconnected',
-              xpGained,
-              progress,
-              leveledUp
-            });
-          }
+          endGame(player.currentGameId, opponentId, true);
         }
         
         activeGames.delete(player.currentGameId);
@@ -420,7 +557,6 @@ function evaluateGuess(guess, target) {
 
   targetArr.forEach(l => targetCount[l] = (targetCount[l] || 0) + 1);
 
-  // Check correct positions
   for (let i = 0; i < target.length; i++) {
     if (guessArr[i] === targetArr[i]) {
       result[i] = 'correct';
@@ -428,7 +564,6 @@ function evaluateGuess(guess, target) {
     }
   }
 
-  // Check present letters
   for (let i = 0; i < target.length; i++) {
     if (result[i] === 'absent' && targetCount[guessArr[i]] > 0) {
       result[i] = 'present';
@@ -439,12 +574,12 @@ function evaluateGuess(guess, target) {
   return result;
 }
 
-function endGame(gameId) {
+function endGame(gameId, winnerId = null, disconnected = false) {
   const game = activeGames.get(gameId);
   if (!game) return;
 
   const playerIds = Object.keys(game.players);
-  const results = {};
+  const isDraw = !winnerId;
 
   playerIds.forEach(socketId => {
     const playerData = game.players[socketId];
@@ -452,47 +587,78 @@ function endGame(gameId) {
     
     if (!player) return;
 
-    const won = playerData.won;
-    const xpGained = calculateXP(won, playerData.guessCount);
-    const { progress, leveledUp } = updatePlayerLevel(player.playerId, xpGained);
+    const won = socketId === winnerId;
+    const isWinner = won;
+    const opponentId = playerIds.find(id => id !== socketId);
+    
+    let xpGained = 0;
+    let rankedChange = 0;
 
-    if (won) {
-      progress.wins++;
+    if (isDraw) {
+      // Draw
+      xpGained = 30;
+      const rankingResult = updateRankedPoints(player.playerId, game.players[opponentId].playerId, true);
+      rankedChange = socketId === playerIds[0] ? rankingResult.winnerChange : rankingResult.loserChange;
+      
+      const { playerData: updatedData, leveledUp } = updatePlayerLevel(player.playerId, xpGained);
+      
+      io.to(socketId).emit('game:end', {
+        result: 'draw',
+        targetWord: game.targetWord,
+        xpGained,
+        rankedChange,
+        newRankedPoints: updatedData.rankedPoints,
+        progress: updatedData,
+        leveledUp,
+        allGuesses: game.allGuesses
+      });
+    } else if (isWinner) {
+      // Winner
+      xpGained = 100 + (game.maxGuesses - game.turnNumber) * 10; // Bonus for quick win
+      const rankingResult = updateRankedPoints(player.playerId, game.players[opponentId].playerId, false);
+      rankedChange = rankingResult.winnerChange;
+      
+      const { playerData: updatedData, leveledUp } = updatePlayerLevel(player.playerId, xpGained);
+      
+      io.to(socketId).emit('game:end', {
+        result: 'win',
+        targetWord: game.targetWord,
+        xpGained,
+        rankedChange,
+        newRankedPoints: updatedData.rankedPoints,
+        progress: updatedData,
+        leveledUp,
+        disconnected,
+        allGuesses: game.allGuesses
+      });
     } else {
-      progress.losses++;
+      // Loser
+      xpGained = 20;
+      const rankingResult = updateRankedPoints(game.players[opponentId].playerId, player.playerId, false);
+      rankedChange = rankingResult.loserChange;
+      
+      const { playerData: updatedData } = updatePlayerLevel(player.playerId, xpGained);
+      
+      io.to(socketId).emit('game:end', {
+        result: 'lose',
+        targetWord: game.targetWord,
+        xpGained,
+        rankedChange,
+        newRankedPoints: updatedData.rankedPoints,
+        progress: updatedData,
+        leveledUp: false,
+        allGuesses: game.allGuesses
+      });
     }
-    progress.gamesPlayed++;
 
-    playerProgress.set(player.playerId, progress);
-
-    results[socketId] = {
-      won,
-      guessCount: playerData.guessCount,
-      xpGained,
-      progress,
-      leveledUp
-    };
-
-    // Send game end event
-    io.to(socketId).emit('game:end', {
-      result: won ? 'win' : 'lose',
-      targetWord: game.targetWord,
-      xpGained,
-      progress,
-      leveledUp,
-      opponent: {
-        nick: game.players[playerIds.find(id => id !== socketId)]?.nick,
-        guessCount: game.players[playerIds.find(id => id !== socketId)]?.guessCount,
-        won: game.players[playerIds.find(id => id !== socketId)]?.won
-      }
-    });
-
-    // Clear current game
-    player.currentGameId = null;
+    if (player) {
+      player.currentGameId = null;
+    }
   });
 
+  game.status = 'finished';
   activeGames.delete(gameId);
-  console.log(`Game ended: ${gameId}`);
+  console.log(`Game ended: ${gameId} - Winner: ${winnerId || 'DRAW'}`);
 }
 
 // ===== REST API =====
@@ -501,7 +667,8 @@ app.get('/health', (req, res) => {
     status: 'ok',
     players: players.size,
     queue: queue.size,
-    activeGames: activeGames.size
+    activeGames: activeGames.size,
+    totalRegistered: Object.keys(persistentPlayers).length
   });
 });
 
@@ -510,24 +677,27 @@ app.get('/stats', (req, res) => {
     totalPlayers: players.size,
     queueSize: queue.size,
     activeGames: activeGames.size,
-    totalProgress: playerProgress.size
+    registeredPlayers: Object.keys(persistentPlayers).length,
+    leaderboardSize: leaderboard.length
   });
 });
 
-app.post('/progress/save', (req, res) => {
-  const { playerId, progress } = req.body;
-  if (!playerId || !progress) {
-    return res.status(400).json({ error: 'Missing data' });
-  }
-  
-  playerProgress.set(playerId, progress);
-  res.json({ success: true });
+app.get('/leaderboard', (req, res) => {
+  res.json({
+    leaderboard: getLeaderboard()
+  });
 });
 
-app.get('/progress/:playerId', (req, res) => {
+app.get('/player/:playerId', (req, res) => {
   const { playerId } = req.params;
-  const progress = getPlayerProgress(playerId);
-  res.json({ progress });
+  const playerData = getPlayerData(playerId);
+  
+  const rank = leaderboard.findIndex(p => p.playerId === playerId) + 1;
+  
+  res.json({
+    player: playerData,
+    leaderboardRank: rank || null
+  });
 });
 
 // ===== SERVER START =====
@@ -536,12 +706,23 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`🎮 Roodle Multiplayer Server running on port ${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/health`);
+  console.log(`🏆 Leaderboard: http://localhost:${PORT}/leaderboard`);
 });
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
-  console.log('SIGTERM signal received: closing HTTP server');
+  console.log('SIGTERM signal received: saving data and closing HTTP server');
+  saveData();
   server.close(() => {
     console.log('HTTP server closed');
+  });
+});
+
+process.on('SIGINT', () => {
+  console.log('SIGINT signal received: saving data and closing HTTP server');
+  saveData();
+  server.close(() => {
+    console.log('HTTP server closed');
+    process.exit(0);
   });
 });
