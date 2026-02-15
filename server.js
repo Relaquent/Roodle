@@ -76,9 +76,48 @@ const WORD_LISTS = {
 };
 
 const RANKS = {
-  1:{name:"Yeni Doğmuş I",xpNeeded:100},
-  2:{name:"Yeni Doğmuş II",xpNeeded:150},
-  3:{name:"Yeni Doğmuş III",xpNeeded:200}
+  1:{name:"Yeni Doğmuş I",xpNeeded:0},
+  2:{name:"Yeni Doğmuş II",xpNeeded:100},
+  3:{name:"Yeni Doğmuş III",xpNeeded:250},
+  4:{name:"Kelime Avcısı I",xpNeeded:450},
+  5:{name:"Kelime Avcısı II",xpNeeded:700},
+  6:{name:"Kelime Avcısı III",xpNeeded:1000},
+  7:{name:"Usta Oyuncu I",xpNeeded:1400},
+  8:{name:"Usta Oyuncu II",xpNeeded:1900},
+  9:{name:"Usta Oyuncu III",xpNeeded:2500},
+  10:{name:"Efsane",xpNeeded:3200}
+};
+
+// ===== COSMETICS =====
+const COSMETICS = {
+  avatarFrames: [
+    { id: 'default', name: 'Varsayılan', cost: 0, unlocked: true },
+    { id: 'bronze', name: 'Bronz Çerçeve', cost: 500, emoji: '🥉' },
+    { id: 'silver', name: 'Gümüş Çerçeve', cost: 1000, emoji: '🥈' },
+    { id: 'gold', name: 'Altın Çerçeve', cost: 2000, emoji: '🥇' },
+    { id: 'diamond', name: 'Elmas Çerçeve', cost: 5000, emoji: '💎' },
+    { id: 'fire', name: 'Ateş Çerçevesi', cost: 3000, emoji: '🔥' },
+    { id: 'ice', name: 'Buz Çerçevesi', cost: 3000, emoji: '❄️' },
+    { id: 'star', name: 'Yıldız Çerçevesi', cost: 4000, emoji: '⭐' }
+  ],
+  profileBadges: [
+    { id: 'winner', name: 'Kazanan', cost: 0, unlocked: true, emoji: '🏆' },
+    { id: 'streak3', name: '3 Seri', cost: 300, emoji: '🔥' },
+    { id: 'streak5', name: '5 Seri', cost: 800, emoji: '🔥🔥' },
+    { id: 'streak10', name: '10 Seri', cost: 2000, emoji: '🔥🔥🔥' },
+    { id: 'master', name: 'Kelime Ustası', cost: 5000, emoji: '👑' },
+    { id: 'legend', name: 'Efsane', cost: 10000, emoji: '⚡' }
+  ],
+  profileColors: [
+    { id: 'default', name: 'Varsayılan', cost: 0, unlocked: true, color: '#00ffb3' },
+    { id: 'purple', name: 'Mor', cost: 500, color: '#9b59b6' },
+    { id: 'red', name: 'Kırmızı', cost: 500, color: '#e74c3c' },
+    { id: 'blue', name: 'Mavi', cost: 500, color: '#3498db' },
+    { id: 'orange', name: 'Turuncu', cost: 500, color: '#e67e22' },
+    { id: 'pink', name: 'Pembe', cost: 800, color: '#ff0095' },
+    { id: 'cyan', name: 'Camgöbeği', cost: 800, color: '#00e1ff' },
+    { id: 'rainbow', name: 'Gökkuşağı', cost: 3000, color: 'linear-gradient(135deg, #00ffb3, #00e1ff, #ff0095, #ffd600)' }
+  ]
 };
 
 function getRandomWord(length){
@@ -96,24 +135,37 @@ function getPlayerData(playerId){
     persistentPlayers[playerId]={
       playerId,totalXP:0,level:1,currentXP:0,wins:0,losses:0,draws:0,
       gamesPlayed:0,rankedPoints:1000,highestRank:1000,winStreak:0,
-      bestWinStreak:0,lastSeen:Date.now()
+      bestWinStreak:0,lastSeen:Date.now(),
+      coins: 0, // Virtual currency for cosmetics
+      dailyPlayedToday: null, // Track daily game date
+      cosmetics: {
+        ownedFrames: ['default'],
+        ownedBadges: ['winner'],
+        ownedColors: ['default'],
+        equippedFrame: 'default',
+        equippedBadge: 'winner',
+        equippedColor: 'default'
+      }
     };
   }
   persistentPlayers[playerId].lastSeen=Date.now();
   return persistentPlayers[playerId];
 }
 
-function updatePlayerLevel(playerId,xpGained){
+function updatePlayerLevel(playerId,xpGained,coinsGained=0){
   let playerData=getPlayerData(playerId);
   playerData.totalXP+=xpGained;
   playerData.currentXP+=xpGained;
+  playerData.coins = (playerData.coins || 0) + coinsGained;
+  
   let leveledUp=false;
-  while(playerData.level<100){
+  while(playerData.level<10){
     const nextRank=RANKS[playerData.level+1];
     if(!nextRank)break;
     if(playerData.totalXP>=nextRank.xpNeeded){
       playerData.level++;
       playerData.currentXP=0;
+      playerData.coins += 500; // Bonus coins on level up
       leveledUp=true;
     }else break;
   }
@@ -193,7 +245,6 @@ function createMatch(player1Id,player2Id,wordLength){
     return;
   }
   
-  // CRITICAL: Decide who starts ONCE
   const startsFirst = Math.random() < 0.5 ? player1Id : player2Id;
   
   console.log('');
@@ -216,10 +267,13 @@ function createMatch(player1Id,player2Id,wordLength){
     player2Nick: player2.nick,
     sharedBoard:[],
     currentRow:0,
-    currentTurn: startsFirst, // CRITICAL: Set once at game start
+    currentTurn: startsFirst,
+    turnTimer: null,
+    turnStartTime: Date.now(),
     maxGuesses:12,
     status:'active',
     winner:null,
+    chatMessages: [],
     createdAt:Date.now(),
     lastActivity:Date.now()
   };
@@ -228,7 +282,10 @@ function createMatch(player1Id,player2Id,wordLength){
   player1.currentGameId=gameId;
   player2.currentGameId=gameId;
   
-  // Send to Player 1
+  // Get player cosmetics
+  const player1Data = getPlayerData(player1.playerId);
+  const player2Data = getPlayerData(player2.playerId);
+  
   const player1Turn = startsFirst === player1Id;
   console.log(`📤 Sending to ${player1.nick}: yourTurn=${player1Turn}`);
   io.to(player1Id).emit('game:start',{
@@ -237,12 +294,12 @@ function createMatch(player1Id,player2Id,wordLength){
     opponent:{
       nick:player2.nick,
       level:player2.level,
-      rank:getPlayerData(player2.playerId).rank
+      rank:player2Data.rank,
+      cosmetics: player2Data.cosmetics
     },
     yourTurn: player1Turn
   });
   
-  // Send to Player 2
   const player2Turn = startsFirst === player2Id;
   console.log(`📤 Sending to ${player2.nick}: yourTurn=${player2Turn}`);
   io.to(player2Id).emit('game:start',{
@@ -251,12 +308,70 @@ function createMatch(player1Id,player2Id,wordLength){
     opponent:{
       nick:player1.nick,
       level:player1.level,
-      rank:getPlayerData(player1.playerId).rank
+      rank:player1Data.rank,
+      cosmetics: player1Data.cosmetics
     },
     yourTurn: player2Turn
   });
   
+  // Start turn timer
+  startTurnTimer(gameId);
+  
   broadcastQueueUpdate();
+}
+
+function startTurnTimer(gameId) {
+  const game = activeGames.get(gameId);
+  if (!game || game.status !== 'active') return;
+  
+  // Clear any existing timer
+  if (game.turnTimer) {
+    clearTimeout(game.turnTimer);
+  }
+  
+  game.turnStartTime = Date.now();
+  
+  // 30 second timer
+  game.turnTimer = setTimeout(() => {
+    handleTurnTimeout(gameId);
+  }, 30000);
+}
+
+function handleTurnTimeout(gameId) {
+  const game = activeGames.get(gameId);
+  if (!game || game.status !== 'active') return;
+  
+  console.log(`⏰ Turn timeout for game ${gameId}`);
+  
+  // Current player loses their turn
+  const currentPlayerId = game.currentTurn;
+  const otherPlayerId = currentPlayerId === game.player1Id ? game.player2Id : game.player1Id;
+  
+  // Switch turn
+  game.currentTurn = otherPlayerId;
+  
+  // Notify both players
+  io.to(currentPlayerId).emit('turn:timeout', {
+    message: 'Süre doldu! Sıra rakibine geçti.'
+  });
+  
+  io.to(otherPlayerId).emit('turn:timeout', {
+    message: 'Rakip süre aşımı yaptı. Senin sıran!'
+  });
+  
+  // Update turn display
+  io.to(currentPlayerId).emit('game:turn:update', {
+    yourTurn: false,
+    nextRow: game.currentRow
+  });
+  
+  io.to(otherPlayerId).emit('game:turn:update', {
+    yourTurn: true,
+    nextRow: game.currentRow
+  });
+  
+  // Start new timer
+  startTurnTimer(gameId);
 }
 
 function broadcastQueueUpdate(){
@@ -292,9 +407,17 @@ function evaluateGuess(guess,target){
   return result;
 }
 
+function broadcastOnlineCount() {
+  io.emit('online:count', { count: players.size });
+}
+
+// Broadcast online count every 5 seconds
+setInterval(broadcastOnlineCount, 5000);
+
 // ===== SOCKET HANDLERS =====
 io.on('connection',(socket)=>{
   console.log('🔌 Connected:',socket.id);
+  broadcastOnlineCount();
   
   socket.on('player:register',(data)=>{
     try{
@@ -310,6 +433,7 @@ io.on('connection',(socket)=>{
       });
       socket.emit('player:registered',{playerId:playerId||socket.id,progress:storedData});
       console.log(`✅ Registered: ${nick} (${socket.id})`);
+      broadcastOnlineCount();
     }catch(error){
       console.error('❌ Register error:',error);
     }
@@ -362,6 +486,12 @@ io.on('connection',(socket)=>{
         return;
       }
       
+      // Clear turn timer
+      if (game.turnTimer) {
+        clearTimeout(game.turnTimer);
+        game.turnTimer = null;
+      }
+      
       const normalizedGuess=guess.toUpperCase().trim();
       if(normalizedGuess.length!==game.wordLength){
         socket.emit('error',{message:'Kelime uzunluğu hatalı!'});
@@ -401,7 +531,6 @@ io.on('connection',(socket)=>{
         return;
       }
       
-      // Switch turn
       const nextTurn = game.currentTurn === game.player1Id ? game.player2Id : game.player1Id;
       game.currentTurn = nextTurn;
       
@@ -410,7 +539,6 @@ io.on('connection',(socket)=>{
       console.log('=====================================');
       console.log('');
       
-      // Send to current player (their turn is over)
       io.to(socket.id).emit('game:board:update',{
         rowIndex:boardEntry.rowIndex,
         guess:normalizedGuess,
@@ -419,7 +547,6 @@ io.on('connection',(socket)=>{
         yourTurn:false
       });
       
-      // Send to opponent (their turn starts)
       const opponentId = socket.id === game.player1Id ? game.player2Id : game.player1Id;
       io.to(opponentId).emit('game:board:update',{
         rowIndex:boardEntry.rowIndex,
@@ -429,9 +556,179 @@ io.on('connection',(socket)=>{
         yourTurn:true
       });
       
+      // Start new turn timer
+      startTurnTimer(gameId);
+      
     }catch(error){
       console.error('❌ Guess error:',error);
       socket.emit('error',{message:'Tahmin hatası!'});
+    }
+  });
+  
+  socket.on('chat:message', (data) => {
+    try {
+      const { gameId, message } = data;
+      const game = activeGames.get(gameId);
+      
+      if (!game || game.status !== 'active') return;
+      
+      const player = players.get(socket.id);
+      if (!player) return;
+      
+      const chatMessage = {
+        nick: player.nick,
+        message: message.substring(0, 100),
+        timestamp: Date.now(),
+        playerId: socket.id
+      };
+      
+      game.chatMessages.push(chatMessage);
+      
+      // Keep only last 50 messages
+      if (game.chatMessages.length > 50) {
+        game.chatMessages = game.chatMessages.slice(-50);
+      }
+      
+      // Broadcast to both players
+      io.to(game.player1Id).emit('chat:message', chatMessage);
+      io.to(game.player2Id).emit('chat:message', chatMessage);
+      
+    } catch (error) {
+      console.error('❌ Chat error:', error);
+    }
+  });
+  
+  socket.on('cosmetic:buy', (data) => {
+    try {
+      const { itemType, itemId } = data;
+      const player = players.get(socket.id);
+      if (!player) return;
+      
+      const playerData = getPlayerData(player.playerId);
+      
+      let item = null;
+      let ownedArray = null;
+      
+      if (itemType === 'frame') {
+        item = COSMETICS.avatarFrames.find(f => f.id === itemId);
+        ownedArray = playerData.cosmetics.ownedFrames;
+      } else if (itemType === 'badge') {
+        item = COSMETICS.profileBadges.find(b => b.id === itemId);
+        ownedArray = playerData.cosmetics.ownedBadges;
+      } else if (itemType === 'color') {
+        item = COSMETICS.profileColors.find(c => c.id === itemId);
+        ownedArray = playerData.cosmetics.ownedColors;
+      }
+      
+      if (!item) {
+        socket.emit('error', { message: 'Geçersiz kozmetik!' });
+        return;
+      }
+      
+      if (ownedArray.includes(itemId)) {
+        socket.emit('error', { message: 'Zaten sahipsin!' });
+        return;
+      }
+      
+      if (playerData.coins < item.cost) {
+        socket.emit('error', { message: 'Yeterli coinin yok!' });
+        return;
+      }
+      
+      playerData.coins -= item.cost;
+      ownedArray.push(itemId);
+      
+      persistentPlayers[player.playerId] = playerData;
+      saveData();
+      
+      socket.emit('cosmetic:purchased', {
+        itemType,
+        itemId,
+        newCoins: playerData.coins,
+        cosmetics: playerData.cosmetics
+      });
+      
+    } catch (error) {
+      console.error('❌ Cosmetic buy error:', error);
+    }
+  });
+  
+  socket.on('cosmetic:equip', (data) => {
+    try {
+      const { itemType, itemId } = data;
+      const player = players.get(socket.id);
+      if (!player) return;
+      
+      const playerData = getPlayerData(player.playerId);
+      
+      if (itemType === 'frame') {
+        if (!playerData.cosmetics.ownedFrames.includes(itemId)) return;
+        playerData.cosmetics.equippedFrame = itemId;
+      } else if (itemType === 'badge') {
+        if (!playerData.cosmetics.ownedBadges.includes(itemId)) return;
+        playerData.cosmetics.equippedBadge = itemId;
+      } else if (itemType === 'color') {
+        if (!playerData.cosmetics.ownedColors.includes(itemId)) return;
+        playerData.cosmetics.equippedColor = itemId;
+      }
+      
+      persistentPlayers[player.playerId] = playerData;
+      saveData();
+      
+      socket.emit('cosmetic:equipped', {
+        itemType,
+        itemId,
+        cosmetics: playerData.cosmetics
+      });
+      
+    } catch (error) {
+      console.error('❌ Cosmetic equip error:', error);
+    }
+  });
+  
+  socket.on('daily:check', () => {
+    try {
+      const player = players.get(socket.id);
+      if (!player) return;
+      
+      const playerData = getPlayerData(player.playerId);
+      const today = new Date().toISOString().split('T')[0];
+      
+      const canPlay = playerData.dailyPlayedToday !== today;
+      
+      socket.emit('daily:status', {
+        canPlay,
+        lastPlayed: playerData.dailyPlayedToday
+      });
+      
+    } catch (error) {
+      console.error('❌ Daily check error:', error);
+    }
+  });
+  
+  socket.on('daily:complete', () => {
+    try {
+      const player = players.get(socket.id);
+      if (!player) return;
+      
+      const playerData = getPlayerData(player.playerId);
+      const today = new Date().toISOString().split('T')[0];
+      
+      if (playerData.dailyPlayedToday === today) {
+        socket.emit('error', { message: 'Bugün zaten oynadın!' });
+        return;
+      }
+      
+      playerData.dailyPlayedToday = today;
+      persistentPlayers[player.playerId] = playerData;
+      saveData();
+      
+      socket.emit('daily:completed', {
+        date: today
+      });
+      
+    } catch (error) {
+      console.error('❌ Daily complete error:', error);
     }
   });
   
@@ -445,6 +742,10 @@ io.on('connection',(socket)=>{
     if(player&&player.currentGameId){
       const game=activeGames.get(player.currentGameId);
       if(game&&game.status==='active'){
+        // Clear timer
+        if (game.turnTimer) {
+          clearTimeout(game.turnTimer);
+        }
         const opponentId = socket.id === game.player1Id ? game.player2Id : game.player1Id;
         if(opponentId){
           endGame(player.currentGameId,opponentId,true);
@@ -454,6 +755,7 @@ io.on('connection',(socket)=>{
     queue.delete(socket.id);
     players.delete(socket.id);
     broadcastQueueUpdate();
+    broadcastOnlineCount();
   });
 });
 
@@ -461,6 +763,12 @@ function endGame(gameId,winnerId=null,disconnected=false){
   try{
     const game=activeGames.get(gameId);
     if(!game)return;
+    
+    // Clear timer
+    if (game.turnTimer) {
+      clearTimeout(game.turnTimer);
+      game.turnTimer = null;
+    }
     
     console.log('');
     console.log('🏁 ========== GAME END ==========');
@@ -482,18 +790,21 @@ function endGame(gameId,winnerId=null,disconnected=false){
       const opponentId = socketId === player1Id ? player2Id : player1Id;
       
       let xpGained=0;
+      let coinsGained=0;
       let rankedChange=0;
       
       if(isDraw){
         xpGained=30;
+        coinsGained=50;
         const rankingResult=updateRankedPoints(player.playerId,players.get(opponentId)?.playerId||'',true);
         rankedChange=socketId===player1Id?rankingResult.winnerChange:rankingResult.loserChange;
-        const{playerData:updatedData,leveledUp}=updatePlayerLevel(player.playerId,xpGained);
+        const{playerData:updatedData,leveledUp}=updatePlayerLevel(player.playerId,xpGained,coinsGained);
         
         io.to(socketId).emit('game:end',{
           result:'draw',
           targetWord:game.targetWord,
           xpGained,
+          coinsGained,
           rankedChange,
           newRankedPoints:updatedData.rankedPoints,
           progress:updatedData,
@@ -502,16 +813,21 @@ function endGame(gameId,winnerId=null,disconnected=false){
       }else if(won){
         const fastWinBonus=Math.max(0,(game.maxGuesses-game.currentRow))*10;
         xpGained=100+fastWinBonus;
-        if(disconnected)xpGained+=50;
+        coinsGained=150 + fastWinBonus;
+        if(disconnected){
+          xpGained+=50;
+          coinsGained+=100;
+        }
         
         const rankingResult=updateRankedPoints(player.playerId,players.get(opponentId)?.playerId||'',false);
         rankedChange=rankingResult.winnerChange;
-        const{playerData:updatedData,leveledUp}=updatePlayerLevel(player.playerId,xpGained);
+        const{playerData:updatedData,leveledUp}=updatePlayerLevel(player.playerId,xpGained,coinsGained);
         
         io.to(socketId).emit('game:end',{
           result:'win',
           targetWord:game.targetWord,
           xpGained,
+          coinsGained,
           rankedChange,
           newRankedPoints:updatedData.rankedPoints,
           progress:updatedData,
@@ -521,14 +837,16 @@ function endGame(gameId,winnerId=null,disconnected=false){
         });
       }else{
         xpGained=20;
+        coinsGained=30;
         const rankingResult=updateRankedPoints(players.get(opponentId)?.playerId||'',player.playerId,false);
         rankedChange=rankingResult.loserChange;
-        const{playerData:updatedData}=updatePlayerLevel(player.playerId,xpGained);
+        const{playerData:updatedData}=updatePlayerLevel(player.playerId,xpGained,coinsGained);
         
         io.to(socketId).emit('game:end',{
           result:'lose',
           targetWord:game.targetWord,
           xpGained,
+          coinsGained,
           rankedChange,
           newRankedPoints:updatedData.rankedPoints,
           progress:updatedData,
@@ -581,14 +899,15 @@ server.listen(PORT,()=>{
   console.log(`
 ╔═══════════════════════════════════════╗
 ║  🎮 ROODLE BY RELAQUENT - SERVER 🎮  ║
-║     SHARED BOARD DEBUG VERSION        ║
+║   v2.0 - ENHANCED EDITION             ║
 ╠═══════════════════════════════════════╣
 ║  Port: ${PORT.toString().padEnd(30)}║
-║  Status: ✅ READY                    ║
+║  Features: ✅ Chat, Timer, Cosmetics ║
+║  Daily Limit: ✅ FIXED               ║
+║  Ranks: ✅ 10 Levels                 ║
 ╚═══════════════════════════════════════╝
   `);
   console.log(`📊 Endpoints: /health /stats`);
-  console.log(`🐛 Debug logs enabled`);
   console.log('');
 });
 
@@ -601,4 +920,3 @@ process.on('SIGINT',()=>{
   saveData();
   server.close(()=>process.exit(0));
 });
-
