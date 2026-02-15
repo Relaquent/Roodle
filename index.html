@@ -990,6 +990,10 @@ header {
       </div>
     </div>
     <button class="icon-btn" id="shop-btn" title="Mağaza">🛍️</button>
+    <button class="icon-btn" id="case-btn" title="Kasa Aç" style="position: relative;">
+      🎰
+      <div style="position: absolute; top: -4px; right: -4px; width: 12px; height: 12px; background: var(--accent3); border-radius: 50%; animation: pulse 1.5s ease-in-out infinite;"></div>
+    </button>
     <button class="icon-btn" id="leaderboard-btn" title="Sıralama Tablosu">🏆</button>
     <button class="icon-btn" id="help-btn" title="Yardım">❓</button>
   </div>
@@ -1196,6 +1200,55 @@ header {
   </div>
 </div>
 
+<div class="modal-overlay" id="case-modal">
+  <div class="modal" style="max-width: 700px;">
+    <button class="modal-close" id="case-close">✕</button>
+    <h2>🎰 Kasa Açma</h2>
+    
+    <div style="text-align: center; margin: 20px 0;">
+      <div style="font-size: 80px; margin-bottom: 16px;">📦</div>
+      <div style="font-size: 28px; font-weight: 900; color: var(--accent); font-family: var(--font-display); margin-bottom: 8px;">Başlangıç Kasası</div>
+      <div style="font-size: 14px; color: var(--text-muted); margin-bottom: 20px;">Temel kozmetikler ve ödüller içerir</div>
+      
+      <div style="display: flex; gap: 16px; justify-content: center; align-items: center; margin-bottom: 24px;">
+        <div style="padding: 16px 32px; background: var(--surface3); border: 2px solid var(--accent4); border-radius: 12px;">
+          <div style="font-size: 32px; font-weight: 900; color: var(--accent4); font-family: var(--font-display);">500</div>
+          <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Kasa Fiyatı</div>
+        </div>
+        <div style="font-size: 32px; color: var(--text-muted);">+</div>
+        <div style="padding: 16px 32px; background: var(--surface3); border: 2px solid var(--accent); border-radius: 12px;">
+          <div style="font-size: 32px; font-weight: 900; color: var(--accent); font-family: var(--font-display);">ÜCRETSİZ</div>
+          <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Anahtar</div>
+        </div>
+      </div>
+    </div>
+    
+    <div id="case-opening-animation" style="display: none; margin: 40px 0;">
+      <div style="position: relative; height: 180px; overflow: hidden; background: var(--surface); border: 2px solid var(--accent); border-radius: 16px; padding: 20px;">
+        <div style="position: absolute; top: 50%; left: 50%; width: 3px; height: 100%; background: var(--accent); transform: translateX(-50%); z-index: 10; box-shadow: 0 0 20px var(--accent);"></div>
+        <div id="case-reel" style="display: flex; gap: 20px; transition: transform 3s cubic-bezier(0.25, 0.1, 0.25, 1); transform: translateX(0);"></div>
+      </div>
+    </div>
+    
+    <div id="case-result" style="display: none; text-align: center; margin: 30px 0;">
+      <div style="font-size: 18px; font-weight: 700; color: var(--text-muted); margin-bottom: 16px;">🎉 KAZANDIN!</div>
+      <div id="case-reward-display" style="padding: 30px; background: linear-gradient(135deg, var(--surface2), var(--surface3)); border: 3px solid var(--reward-color, var(--accent)); border-radius: 20px; box-shadow: 0 0 40px var(--reward-glow, rgba(0,255,179,0.5));">
+        <div id="case-reward-emoji" style="font-size: 80px; margin-bottom: 12px;">🎁</div>
+        <div id="case-reward-name" style="font-size: 24px; font-weight: 900; color: var(--reward-color, var(--accent)); font-family: var(--font-display); margin-bottom: 8px;">Ödül İsmi</div>
+        <div id="case-reward-rarity" style="font-size: 14px; color: var(--reward-color, var(--accent)); text-transform: uppercase; letter-spacing: 0.2em; font-weight: 700;">Nadir</div>
+      </div>
+    </div>
+    
+    <button class="btn btn-primary" id="open-case-btn" style="display: block;">
+      🎲 KASA AÇ (500 Coin)
+    </button>
+    
+    <button class="btn btn-primary" id="open-another-case-btn" style="display: none;">
+      🎲 BİR TANE DAHA AÇ
+    </button>
+  </div>
+</div>
+
 <script>
 // ===== CONFIG =====
 const SERVER_URL = 'https://roodles.onrender.com'; // RENDER URL'NİZİ BURAYA YAZIN!
@@ -1298,6 +1351,50 @@ const RARITY_COLORS = {
   legendary: { color: '#ff9800', glow: 'rgba(255, 152, 0, 0.7)', name: 'Efsanevi' },
   mythic: { color: '#f44336', glow: 'rgba(244, 67, 54, 0.8)', name: 'Mitik' }
 };
+
+// ===== CASES SYSTEM =====
+const CASES = {
+  starter: {
+    id: 'starter',
+    name: 'Başlangıç Kasası',
+    emoji: '📦',
+    description: 'Temel kozmetikler ve ödüller',
+    cost: 500,
+    keyCost: 0, // Free to open
+    color: '#4caf50',
+    rewards: [
+      // Coins (30% chance)
+      { type: 'coins', amount: 100, rarity: 'common', weight: 15, name: '100 Coin' },
+      { type: 'coins', amount: 250, rarity: 'uncommon', weight: 10, name: '250 Coin' },
+      { type: 'coins', amount: 500, rarity: 'rare', weight: 5, name: '500 Coin' },
+      
+      // XP (20% chance)
+      { type: 'xp', amount: 50, rarity: 'common', weight: 10, name: '50 XP' },
+      { type: 'xp', amount: 100, rarity: 'uncommon', weight: 7, name: '100 XP' },
+      { type: 'xp', amount: 250, rarity: 'rare', weight: 3, name: '250 XP' },
+      
+      // Cosmetics (50% chance)
+      { type: 'frame', id: 'bronze', rarity: 'common', weight: 12, name: 'Bronz Şövalye' },
+      { type: 'frame', id: 'silver', rarity: 'uncommon', weight: 8, name: 'Gümüş Lejyon' },
+      { type: 'frame', id: 'gold', rarity: 'rare', weight: 5, name: 'Altın İmparator' },
+      { type: 'frame', id: 'fire', rarity: 'rare', weight: 4, name: 'Ateş Efendisi' },
+      { type: 'frame', id: 'ice', rarity: 'rare', weight: 4, name: 'Buz Kralı' },
+      { type: 'frame', id: 'diamond', rarity: 'epic', weight: 2, name: 'Elmas Titan' },
+      
+      { type: 'badge', id: 'streak3', rarity: 'common', weight: 10, name: 'Ateş Başlangıcı' },
+      { type: 'badge', id: 'streak5', rarity: 'uncommon', weight: 6, name: 'Alev Yüreği' },
+      { type: 'badge', id: 'speedster', rarity: 'rare', weight: 3, name: 'Hız Şeytanı' },
+      
+      { type: 'color', id: 'crimson', rarity: 'common', weight: 10, name: 'Kızıl Öfke' },
+      { type: 'color', id: 'royal', rarity: 'common', weight: 10, name: 'Kraliyet Mavisi' },
+      { type: 'color', id: 'toxic', rarity: 'uncommon', weight: 7, name: 'Zehir Yeşili' },
+      { type: 'color', id: 'cyberpink', rarity: 'rare', weight: 4, name: 'Cyber Pembe' },
+      { type: 'color', id: 'gold', rarity: 'rare', weight: 3, name: 'Altın Işıltısı' }
+    ]
+  }
+};
+
+let caseOpeningInProgress = false;
 
 const KB_ROWS = [
   ['E','R','T','Y','U','I','O','P','Ğ','Ü'],
@@ -2219,6 +2316,11 @@ function connectToServer() {
       updateProfileDisplay();
       showToast('✅ Donatıldı!');
     });
+    
+    socket.on('case:reward', (data) => {
+      console.log('🎰 Case reward:', data);
+      animateCaseOpening(data.reward);
+    });
 
     socket.on('error', (data) => {
       console.error('❌ Server error:', data);
@@ -2388,6 +2490,173 @@ function renderOnlinePlayers() {
       </div>
     `;
   }).join('');
+}
+
+// ===== CASE OPENING =====
+function openCase() {
+  if (caseOpeningInProgress) return;
+  
+  const caseData = CASES.starter;
+  const totalCost = caseData.cost + caseData.keyCost;
+  
+  if ((playerProfile.coins || 0) < totalCost) {
+    showToast('Yeterli coin yok! 💰', true);
+    return;
+  }
+  
+  if (!socket || !socket.connected) {
+    showToast('Sunucuya bağlanılamıyor!', true);
+    return;
+  }
+  
+  caseOpeningInProgress = true;
+  
+  // Deduct cost
+  playerProfile.coins -= totalCost;
+  saveProfile();
+  updateProfileDisplay();
+  
+  // Hide button, show animation
+  document.getElementById('open-case-btn').style.display = 'none';
+  document.getElementById('case-result').style.display = 'none';
+  document.getElementById('case-opening-animation').style.display = 'block';
+  
+  // Request reward from server
+  socket.emit('case:open', { caseId: 'starter' });
+}
+
+function animateCaseOpening(reward) {
+  const reel = document.getElementById('case-reel');
+  const allRewards = CASES.starter.rewards;
+  
+  // Generate reel with random items and the winning item in the middle
+  const reelItems = [];
+  const numItems = 50;
+  const winningIndex = 25;
+  
+  for (let i = 0; i < numItems; i++) {
+    let item;
+    if (i === winningIndex) {
+      item = reward;
+    } else {
+      item = allRewards[Math.floor(Math.random() * allRewards.length)];
+    }
+    
+    const rarityInfo = RARITY_COLORS[item.rarity] || RARITY_COLORS.common;
+    
+    reelItems.push(`
+      <div style="min-width: 140px; height: 140px; background: linear-gradient(135deg, var(--surface2), var(--surface3)); border: 3px solid ${rarityInfo.color}; border-radius: 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; box-shadow: 0 0 20px ${rarityInfo.glow};">
+        <div style="font-size: 48px; margin-bottom: 8px;">${getRewardEmoji(item)}</div>
+        <div style="font-size: 11px; font-weight: 700; color: ${rarityInfo.color}; text-align: center; padding: 0 8px;">${item.name}</div>
+      </div>
+    `);
+  }
+  
+  reel.innerHTML = reelItems.join('');
+  
+  // Calculate offset to center the winning item
+  const itemWidth = 160; // 140px + 20px gap
+  const centerOffset = (700 / 2) - (itemWidth / 2); // modal width / 2
+  const targetOffset = -(winningIndex * itemWidth) + centerOffset;
+  
+  // Animate
+  setTimeout(() => {
+    reel.style.transform = `translateX(${targetOffset}px)`;
+  }, 100);
+  
+  // Show result after animation
+  setTimeout(() => {
+    displayCaseResult(reward);
+  }, 3200);
+}
+
+function getRewardEmoji(reward) {
+  if (reward.type === 'coins') return '💰';
+  if (reward.type === 'xp') return '⭐';
+  
+  // Find cosmetic emoji
+  if (reward.type === 'frame') {
+    const item = COSMETICS.avatarFrames.find(f => f.id === reward.id);
+    return item?.emoji || '🖼️';
+  }
+  if (reward.type === 'badge') {
+    const item = COSMETICS.profileBadges.find(b => b.id === reward.id);
+    return item?.emoji || '🏅';
+  }
+  if (reward.type === 'color') return '🎨';
+  if (reward.type === 'background') return '🌌';
+  
+  return '🎁';
+}
+
+function displayCaseResult(reward) {
+  const rarityInfo = RARITY_COLORS[reward.rarity] || RARITY_COLORS.common;
+  
+  document.getElementById('case-opening-animation').style.display = 'none';
+  document.getElementById('case-result').style.display = 'block';
+  
+  const resultDisplay = document.getElementById('case-reward-display');
+  resultDisplay.style.setProperty('--reward-color', rarityInfo.color);
+  resultDisplay.style.setProperty('--reward-glow', rarityInfo.glow);
+  
+  document.getElementById('case-reward-emoji').textContent = getRewardEmoji(reward);
+  document.getElementById('case-reward-name').textContent = reward.name;
+  document.getElementById('case-reward-name').style.color = rarityInfo.color;
+  document.getElementById('case-reward-rarity').textContent = rarityInfo.name;
+  document.getElementById('case-reward-rarity').style.color = rarityInfo.color;
+  
+  document.getElementById('open-another-case-btn').style.display = 'block';
+  
+  // Apply reward
+  if (reward.type === 'coins') {
+    playerProfile.coins = (playerProfile.coins || 0) + reward.amount;
+    showToast(`+${reward.amount} Coin kazandın! 💰`);
+  } else if (reward.type === 'xp') {
+    updatePlayerLevel(reward.amount);
+    showToast(`+${reward.amount} XP kazandın! ⭐`);
+  } else {
+    // Cosmetic reward
+    const typeMap = {
+      frame: 'ownedFrames',
+      badge: 'ownedBadges',
+      color: 'ownedColors',
+      background: 'ownedBackgrounds'
+    };
+    
+    const ownedKey = typeMap[reward.type];
+    if (ownedKey && playerProfile.cosmetics) {
+      if (!playerProfile.cosmetics[ownedKey]) {
+        playerProfile.cosmetics[ownedKey] = [];
+      }
+      if (!playerProfile.cosmetics[ownedKey].includes(reward.id)) {
+        playerProfile.cosmetics[ownedKey].push(reward.id);
+        showToast(`${reward.name} kazandın! 🎉`);
+      } else {
+        // Duplicate - give coins instead
+        const duplicateCoins = Math.floor(getCosmeticCost(reward.type, reward.id) * 0.5);
+        playerProfile.coins = (playerProfile.coins || 0) + duplicateCoins;
+        showToast(`Duplike! +${duplicateCoins} Coin 💰`);
+      }
+    }
+  }
+  
+  saveProfile();
+  updateProfileDisplay();
+  
+  caseOpeningInProgress = false;
+  
+  launchConfetti();
+}
+
+function getCosmeticCost(type, id) {
+  const costs = {
+    frame: { bronze:800, silver:1500, gold:3000, diamond:6000, fire:4500, ice:4500, lightning:5500, cosmic:8000, phoenix:10000, shadow:7500, rainbow:9000, galaxy:12000 },
+    badge: { streak3:500, streak5:1200, streak10:3000, speedster:2500, perfectionist:4000, master:6000, veteran:5000, legend:12000, unbeatable:15000, genius:8000, collector:10000 },
+    color: { crimson:800, royal:800, toxic:1200, purple:1200, sunset:1500, cyberpink:2000, electric:2000, gold:3000, rainbow:5000, lava:4500, ocean:4500, galaxy:6000, matrix:7000, prismatic:10000 },
+    background: { stars:2000, matrix:3500, fire:4000, lightning:5000, cosmic:6000, aurora:7500, portal:10000 }
+  };
+  
+  return costs[type]?.[id] || 500;
 }
 
 function renderLeaderboard(data) {
@@ -2610,6 +2879,30 @@ document.getElementById('shop-btn').addEventListener('click', () => {
 
 document.getElementById('shop-close').addEventListener('click', () => {
   document.getElementById('shop-modal').classList.remove('show');
+});
+
+document.getElementById('case-btn').addEventListener('click', () => {
+  document.getElementById('case-modal').classList.add('show');
+  document.getElementById('case-opening-animation').style.display = 'none';
+  document.getElementById('case-result').style.display = 'none';
+  document.getElementById('open-case-btn').style.display = 'block';
+  document.getElementById('open-another-case-btn').style.display = 'none';
+});
+
+document.getElementById('case-close').addEventListener('click', () => {
+  if (!caseOpeningInProgress) {
+    document.getElementById('case-modal').classList.remove('show');
+  }
+});
+
+document.getElementById('open-case-btn').addEventListener('click', () => {
+  openCase();
+});
+
+document.getElementById('open-another-case-btn').addEventListener('click', () => {
+  document.getElementById('case-result').style.display = 'none';
+  document.getElementById('open-case-btn').style.display = 'block';
+  document.getElementById('open-another-case-btn').style.display = 'none';
 });
 
 document.querySelectorAll('.shop-tab').forEach(tab => {
