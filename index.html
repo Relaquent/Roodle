@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Roodle - Multiplayer Kelime Oyunu</title>
-<meta name="description" content="Türkçe multiplayer kelime tahmin oyunu. Günlük, sınırsız ve rekabetçi modlarda oyna!">
+<title>Relaquent Roodle - Premium Multiplayer Kelime Oyunu</title>
+<meta name="description" content="Relaquent Roodle - Premium Türkçe multiplayer kelime tahmin oyunu. Günlük, sınırsız ve rekabetçi modlarda oyna!">
 <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@300;400;500;600;700;800;900&family=Space+Mono:wght@400;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
 <style>
@@ -95,6 +95,14 @@ header {
 }
 
 .logo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.logo-main {
   font-family: var(--font-display);
   font-size: 42px;
   font-weight: 900;
@@ -103,9 +111,17 @@ header {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  cursor: pointer;
-  user-select: none;
   animation: logoGlow 4s ease-in-out infinite;
+}
+
+.logo-brand {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.3em;
+  color: var(--accent);
+  text-transform: uppercase;
+  opacity: 0.8;
 }
 
 @keyframes logoGlow {
@@ -844,7 +860,7 @@ header {
   header { 
     padding: 24px 24px 0;
   }
-  .logo { 
+  .logo-main { 
     font-size: 36px; 
   }
   .mode-selector, 
@@ -871,7 +887,7 @@ header {
     --tile-size: 56px; 
     --tile-gap: 7px; 
   }
-  .logo { 
+  .logo-main { 
     font-size: 32px; 
   }
   .tile { 
@@ -914,7 +930,10 @@ header {
 </div>
 
 <header>
-  <div class="logo">ROODLE</div>
+  <div class="logo">
+    <div class="logo-main">ROODLE</div>
+    <div class="logo-brand">BY RELAQUENT</div>
+  </div>
   <div class="header-controls">
     <div class="user-profile" id="user-profile">
       <div class="user-avatar" id="user-avatar">🎮</div>
@@ -1031,6 +1050,11 @@ header {
         Hızlı kazanırsan bonus XP alırsın!
       </div>
     </div>
+    <div style="margin: 16px 0; padding: 16px; background: linear-gradient(135deg, var(--surface2) 0%, var(--surface3) 100%); border: 1px solid var(--accent); border-radius: 12px; text-align: center;">
+      <div style="font-family: var(--font-display); font-size: 14px; font-weight: 700; color: var(--accent); letter-spacing: 0.2em; margin-bottom: 4px;">POWERED BY</div>
+      <div style="font-family: var(--font-display); font-size: 28px; font-weight: 900; background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">RELAQUENT</div>
+      <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Premium Gaming Experience</div>
+    </div>
     <button class="btn btn-primary" id="help-close-btn">Başla! 🎮</button>
   </div>
 </div>
@@ -1064,7 +1088,7 @@ header {
 
 <script>
 // ===== CONFIG =====
-const SERVER_URL = 'https://roodles.onrender.com'; // RENDER URL'NİZİ BURAYA YAZIN!
+const SERVER_URL = 'https://your-render-app.onrender.com'; // RENDER URL'NİZİ BURAYA YAZIN!
 
 // ===== WORD LISTS =====
 const WORD_LISTS = {
@@ -1115,6 +1139,7 @@ let board = [];
 let keyStates = {};
 let currentGameId = null;
 let opponentData = null;
+let isMyTurn = false;
 
 let playerProfile = {
   playerId: null,
@@ -1241,6 +1266,13 @@ document.addEventListener('keydown', e => {
 
 function handleKey(key) {
   if (gameOver || !inputEnabled) return;
+  
+  // Multiplayer modunda sıra kontrolü
+  if (gameMode === 'multiplayer' && currentGameId && !isMyTurn) {
+    showToast('Sıran değil! ⏳', true);
+    return;
+  }
+  
   if (key === 'ENTER') submitGuess();
   else if (key === '⌫') deleteLetter();
   else if (currentCol < wordLength && /^[A-ZÇĞİÖŞÜ]$/.test(key)) addLetter(key);
@@ -1293,10 +1325,18 @@ function submitGuess() {
       showToast('Aktif oyun yok!', true);
       return;
     }
+    if (!isMyTurn) {
+      showToast('Sıran değil! ⏳', true);
+      return;
+    }
+    
+    // Send guess to server
+    console.log('📤 Sending guess to server:', guess);
     socket.emit('game:guess', { gameId: currentGameId, guess: guess });
     return;
   }
 
+  // Solo game logic
   if (!targetWord) {
     showToast('Oyun başlamadı!', true);
     return;
@@ -1489,6 +1529,7 @@ function newGame() {
   currentCol = 0;
   currentGuess = [];
   inputEnabled = true;
+  isMyTurn = false;
   
   buildGrid();
   buildKeyboard();
@@ -1496,11 +1537,19 @@ function newGame() {
 
 function startDailyGame() {
   const today = new Date();
+  const todayStr = today.toISOString().split('T')[0];
   const dayOfYear = Math.floor((today - new Date(today.getFullYear(), 0, 0)) / 1000 / 60 / 60 / 24);
   const list = WORD_LISTS[wordLength];
   
   if (!list || list.length === 0) {
     showToast('Bu uzunluk için kelime yok!', true);
+    return;
+  }
+  
+  const dailyData = getDailyGameData();
+  if (dailyData.lastPlayedDate === todayStr && dailyData.completed) {
+    showToast('Bugünün kelimesini zaten oynadın! Yarın tekrar gel! 📅', true);
+    showDailyGameResult(dailyData);
     return;
   }
   
@@ -1510,6 +1559,64 @@ function startDailyGame() {
   newGame();
   enableInput();
   showToast('📅 Günün kelimesi başladı!');
+}
+
+function getDailyGameData() {
+  try {
+    const data = localStorage.getItem('roodle_daily_game');
+    if (data) {
+      return JSON.parse(data);
+    }
+  } catch (error) {
+    console.error('Failed to load daily game data:', error);
+  }
+  return {
+    lastPlayedDate: null,
+    completed: false,
+    won: false,
+    guessCount: 0,
+    targetWord: ''
+  };
+}
+
+function saveDailyGameData(won, guessCount, targetWord) {
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    const data = {
+      lastPlayedDate: today,
+      completed: true,
+      won: won,
+      guessCount: guessCount,
+      targetWord: targetWord
+    };
+    localStorage.setItem('roodle_daily_game', JSON.stringify(data));
+  } catch (error) {
+    console.error('Failed to save daily game data:', error);
+  }
+}
+
+function showDailyGameResult(dailyData) {
+  const modal = document.getElementById('result-modal');
+  const title = document.getElementById('result-title');
+  const msg = document.getElementById('result-msg');
+  const answerDiv = document.getElementById('result-answer');
+  const wordEl = document.getElementById('result-word');
+  const xpAmount = document.getElementById('result-xp-amount');
+
+  if (dailyData.won) {
+    title.textContent = '✅ Bugün Tamamlandı!';
+    msg.textContent = `Bugünün kelimesini ${dailyData.guessCount} tahminde buldun! Yarın yeni kelime için geri gel! 🌟`;
+    answerDiv.style.display = 'none';
+  } else {
+    title.textContent = '📅 Bugün Tamamlandı';
+    msg.textContent = 'Bugünün kelimesini oynamıştın. Yarın yeni kelime!';
+    answerDiv.style.display = 'block';
+    if (wordEl) wordEl.textContent = dailyData.targetWord;
+  }
+
+  xpAmount.textContent = '+0';
+  
+  setTimeout(() => modal.classList.add('show'), 100);
 }
 
 function startUnlimitedGame() {
@@ -1556,6 +1663,7 @@ function connectToServer() {
     });
 
     socket.on('player:registered', (data) => {
+      console.log('✅ Oyuncu kaydedildi:', data);
       if (data.progress) {
         playerProfile = { ...playerProfile, ...data.progress, playerId: data.playerId };
         updateProfileDisplay();
@@ -1563,19 +1671,24 @@ function connectToServer() {
     });
 
     socket.on('queue:joined', () => {
+      console.log('🎯 Sıraya katıldı');
       document.getElementById('queue-btn').textContent = 'Sıradan Çık';
       document.getElementById('queue-btn').classList.add('searching');
       showToast('⚔️ Rakip aranıyor...');
     });
 
     socket.on('queue:update', (data) => {
+      console.log('📋 Sıra güncellendi:', data);
       renderQueuePlayers(data.players || []);
     });
 
     socket.on('game:start', (data) => {
+      console.log('🎮 Oyun başladı:', data);
+      
       currentGameId = data.gameId;
       opponentData = data.opponent;
       wordLength = data.wordLength;
+      isMyTurn = data.yourTurn;
       
       document.getElementById('queue-btn').classList.remove('searching');
       document.getElementById('queue-section').style.display = 'none';
@@ -1583,62 +1696,81 @@ function connectToServer() {
       showOpponentPanel();
       newGame();
       
-      if (data.yourTurn) {
+      if (isMyTurn) {
         enableInput();
         updateTurnDisplay(true, opponentData.nick);
         showToast(`🎮 Oyun başladı! SENİN SIRAIN`);
       } else {
         disableInput();
         updateTurnDisplay(false, opponentData.nick);
-        showToast(`🎮 Oyun başladı! RAKIP BAŞLIYOR`);
+        showToast(`🎮 Oyun başladı! ${opponentData.nick}'in sırası`);
       }
     });
 
     socket.on('game:guess:result', (data) => {
+      console.log('📥 Tahmin sonucu:', data);
+      
       revealRow(currentRow, data.guess, data.result, () => {
         if (data.won) {
           gameOver = true;
           disableInput();
+          isMyTurn = false;
           setTimeout(() => celebrateWin(), 500);
         } else if (data.guessCount >= 6) {
           disableInput();
+          isMyTurn = false;
         } else {
           currentRow++;
           currentCol = 0;
           currentGuess = [];
+          // Sıra rakibe geçti
+          isMyTurn = false;
+          disableInput();
+          updateTurnDisplay(false, opponentData?.nick || 'Rakip');
         }
       });
     });
 
     socket.on('game:opponent:update', (data) => {
+      console.log('👥 Rakip güncellendi:', data);
       updateOpponentProgress(data);
     });
 
     socket.on('game:opponent:guess', (data) => {
+      console.log('🎯 Rakip tahmin yaptı:', data);
+      
       if (data.yourTurn) {
+        isMyTurn = true;
         enableInput();
         updateTurnDisplay(true, opponentData?.nick || 'Rakip');
         if (!data.opponentWon) showToast('Senin sıran! 🎯');
       } else {
+        isMyTurn = false;
         disableInput();
         updateTurnDisplay(false, opponentData?.nick || 'Rakip');
       }
       
       if (data.opponentWon) {
         gameOver = true;
+        isMyTurn = false;
         disableInput();
       }
     });
 
     socket.on('game:turn:start', () => {
+      console.log('⚡ Sıran başladı!');
+      isMyTurn = true;
       enableInput();
       updateTurnDisplay(true, opponentData?.nick || 'Rakip');
       showToast('Senin sıran! 🎯');
     });
 
     socket.on('game:end', (data) => {
+      console.log('🏁 Oyun bitti:', data);
+      
       gameOver = true;
       targetWord = data.targetWord;
+      isMyTurn = false;
       
       if (data.progress) {
         playerProfile = { ...playerProfile, ...data.progress };
@@ -1652,10 +1784,12 @@ function connectToServer() {
     });
 
     socket.on('leaderboard:update', (data) => {
+      console.log('🏆 Leaderboard güncellendi');
       renderLeaderboard(data.leaderboard);
     });
 
     socket.on('error', (data) => {
+      console.error('❌ Server error:', data);
       showToast(data.message || 'Bir hata oluştu', true);
     });
   } catch (error) {
@@ -1666,6 +1800,7 @@ function connectToServer() {
 
 function registerPlayer() {
   if (!socket || !socket.connected) return;
+  console.log('📝 Oyuncu kaydediliyor...');
   socket.emit('player:register', {
     playerId: playerProfile.playerId,
     nick: playerProfile.nick,
@@ -1820,6 +1955,10 @@ function showResultModal(data) {
 
   xpAmount.textContent = `+${data.xpGained || 0}`;
   
+  if (gameMode === 'daily') {
+    saveDailyGameData(data.result === 'win', data.guessCount, data.targetWord);
+  }
+  
   if (data.leveledUp) {
     setTimeout(() => {
       showToast(`🎊 Seviye Atladın! ${RANKS[playerProfile.level].name}`);
@@ -1876,6 +2015,8 @@ document.getElementById('queue-btn').addEventListener('click', () => {
   const btn = document.getElementById('queue-btn');
   if (btn.classList.contains('searching')) {
     socket.emit('queue:leave');
+    btn.textContent = 'Sıraya Katıl';
+    btn.classList.remove('searching');
   } else {
     socket.emit('queue:join', { preferredLength: wordLength });
   }
@@ -1889,11 +2030,14 @@ document.getElementById('result-new-btn').addEventListener('click', () => {
     document.getElementById('queue-section').style.display = 'block';
     currentGameId = null;
     opponentData = null;
+    isMyTurn = false;
     newGame();
   } else if (gameMode === 'unlimited') {
     startUnlimitedGame();
   } else if (gameMode === 'daily') {
-    startDailyGame();
+    showToast('Bugünün kelimesini zaten oynadın! Yarın tekrar gel! 📅', true);
+    newGame();
+    disableInput();
   }
 });
 
