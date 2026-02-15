@@ -220,8 +220,11 @@ function createMatch(player1Id,player2Id,wordLength){
   const player1=players.get(player1Id);
   const player2=players.get(player2Id);
   if(!player1||!player2)return;
+  
+  // Remove from queue
   queue.delete(player1Id);
   queue.delete(player2Id);
+  
   const gameId=generateGameId();
   const targetWord=getRandomWord(wordLength);
   if(!targetWord){
@@ -230,14 +233,69 @@ function createMatch(player1Id,player2Id,wordLength){
     queue.set(player2Id,{wordLength,joinedAt:Date.now()});
     return;
   }
+  
+  // Randomly decide who goes first
   const firstPlayer=coinFlip()?player1Id:player2Id;
-  const game={gameId,targetWord,wordLength,players:{[player1Id]:{playerId:player1.playerId,nick:player1.nick,level:player1.level,guesses:[],finished:false,won:false},[player2Id]:{playerId:player2.playerId,nick:player2.nick,level:player2.level,guesses:[],finished:false,won:false}},currentTurn:firstPlayer,turnNumber:0,maxGuesses:6,status:'active',createdAt:Date.now(),lastActivity:Date.now()};
+  
+  const game={
+    gameId,
+    targetWord,
+    wordLength,
+    players:{
+      [player1Id]:{
+        playerId:player1.playerId,
+        nick:player1.nick,
+        level:player1.level,
+        guesses:[],
+        finished:false,
+        won:false
+      },
+      [player2Id]:{
+        playerId:player2.playerId,
+        nick:player2.nick,
+        level:player2.level,
+        guesses:[],
+        finished:false,
+        won:false
+      }
+    },
+    currentTurn:firstPlayer,
+    turnNumber:0,
+    maxGuesses:6,
+    status:'active',
+    createdAt:Date.now(),
+    lastActivity:Date.now()
+  };
+  
   activeGames.set(gameId,game);
   player1.currentGameId=gameId;
   player2.currentGameId=gameId;
-  console.log(`🎮 ${gameId}|${player1.nick} vs ${player2.nick}|${targetWord}`);
-  io.to(player1Id).emit('game:start',{gameId,wordLength,opponent:{nick:player2.nick,level:player2.level,rank:getPlayerData(player2.playerId).rank},yourTurn:firstPlayer===player1Id});
-  io.to(player2Id).emit('game:start',{gameId,wordLength,opponent:{nick:player1.nick,level:player1.level,rank:getPlayerData(player1.playerId).rank},yourTurn:firstPlayer===player2Id});
+  
+  console.log(`🎮 Game ${gameId} | ${player1.nick} vs ${player2.nick} | Word: ${targetWord} | First: ${firstPlayer === player1Id ? player1.nick : player2.nick}`);
+  
+  // Send game start to both players with correct turn information
+  io.to(player1Id).emit('game:start',{
+    gameId,
+    wordLength,
+    opponent:{
+      nick:player2.nick,
+      level:player2.level,
+      rank:getPlayerData(player2.playerId).rank
+    },
+    yourTurn: firstPlayer === player1Id
+  });
+  
+  io.to(player2Id).emit('game:start',{
+    gameId,
+    wordLength,
+    opponent:{
+      nick:player1.nick,
+      level:player1.level,
+      rank:getPlayerData(player1.playerId).rank
+    },
+    yourTurn: firstPlayer === player2Id
+  });
+  
   broadcastQueueUpdate();
 }
 
@@ -250,97 +308,188 @@ function broadcastQueueUpdate(){
 }
 
 io.on('connection',(socket)=>{
-  console.log('🔌',socket.id);
+  console.log('🔌 Client connected:',socket.id);
+  
   socket.on('player:register',(data)=>{
     try{
       const{playerId,nick,level,preferredLength}=data;
       const storedData=getPlayerData(playerId||socket.id);
-      players.set(socket.id,{socketId:socket.id,playerId:playerId||socket.id,nick:(nick||'Oyuncu').substring(0,16),level:storedData.level||level||1,rank:storedData.rank||RANKS[storedData.level||1].name,preferredLength:preferredLength||5,currentGameId:null,connectedAt:Date.now()});
+      players.set(socket.id,{
+        socketId:socket.id,
+        playerId:playerId||socket.id,
+        nick:(nick||'Oyuncu').substring(0,16),
+        level:storedData.level||level||1,
+        rank:storedData.rank||RANKS[storedData.level||1].name,
+        preferredLength:preferredLength||5,
+        currentGameId:null,
+        connectedAt:Date.now()
+      });
       socket.emit('player:registered',{playerId:playerId||socket.id,progress:storedData});
-      console.log(`✅ ${nick}(${socket.id})`);
+      console.log(`✅ Registered: ${nick} (${socket.id})`);
     }catch(error){
-      console.error('❌ register:',error);
+      console.error('❌ Register error:',error);
       socket.emit('error',{message:'Kayıt hatası!'});
     }
   });
+  
   socket.on('queue:join',(data)=>{
     try{
       const player=players.get(socket.id);
-      if(!player){socket.emit('error',{message:'Önce kayıt!'});return;}
-      if(queue.has(socket.id)){socket.emit('error',{message:'Zaten sıradasınız!'});return;}
+      if(!player){
+        socket.emit('error',{message:'Önce kayıt olun!'});
+        return;
+      }
+      if(queue.has(socket.id)){
+        socket.emit('error',{message:'Zaten sıradasınız!'});
+        return;
+      }
       const wordLength=data.preferredLength||player.preferredLength||5;
-      if(!WORD_LISTS[wordLength]||WORD_LISTS[wordLength].length===0){socket.emit('error',{message:'Bu uzunluk desteklenmiyor!'});return;}
+      if(!WORD_LISTS[wordLength]||WORD_LISTS[wordLength].length===0){
+        socket.emit('error',{message:'Bu uzunluk desteklenmiyor!'});
+        return;
+      }
       queue.set(socket.id,{wordLength:wordLength,joinedAt:Date.now()});
       socket.emit('queue:joined',{position:queue.size});
-      console.log(`🎯 ${player.nick}->${queue.size}`);
+      console.log(`🎯 ${player.nick} joined queue -> ${queue.size} players`);
       broadcastQueueUpdate();
       setTimeout(()=>tryMatchPlayers(),100);
     }catch(error){
-      console.error('❌ queue:join:',error);
+      console.error('❌ Queue join error:',error);
       socket.emit('error',{message:'Sıra hatası!'});
     }
   });
+  
   socket.on('queue:leave',()=>{
     try{
       queue.delete(socket.id);
       socket.emit('queue:left');
       broadcastQueueUpdate();
-      console.log(`⬅️ ${socket.id}`);
+      console.log(`⬅️ Player left queue: ${socket.id}`);
     }catch(error){
-      console.error('❌ queue:leave:',error);
+      console.error('❌ Queue leave error:',error);
     }
   });
+  
   socket.on('game:guess',(data)=>{
     try{
       const{gameId,guess}=data;
-      if(!guess||typeof guess!=='string'){socket.emit('error',{message:'Geçersiz!'});return;}
+      console.log(`📥 Guess received from ${socket.id}: "${guess}" in game ${gameId}`);
+      
+      if(!guess||typeof guess!=='string'){
+        socket.emit('error',{message:'Geçersiz tahmin!'});
+        return;
+      }
+      
       const game=activeGames.get(gameId);
-      if(!game||game.status!=='active'){socket.emit('error',{message:'Oyun yok!'});return;}
-      if(game.currentTurn!==socket.id){socket.emit('error',{message:'Sıran değil!'});return;}
+      if(!game||game.status!=='active'){
+        socket.emit('error',{message:'Oyun bulunamadı!'});
+        return;
+      }
+      
+      // Check if it's this player's turn
+      if(game.currentTurn!==socket.id){
+        console.log(`❌ Not player's turn. Current: ${game.currentTurn}, Sender: ${socket.id}`);
+        socket.emit('error',{message:'Sıran değil!'});
+        return;
+      }
+      
       const playerData=game.players[socket.id];
-      if(!playerData||playerData.finished){socket.emit('error',{message:'Aktif değil!'});return;}
+      if(!playerData||playerData.finished){
+        socket.emit('error',{message:'Oyun bitti!'});
+        return;
+      }
+      
       const normalizedGuess=guess.toUpperCase().trim();
-      if(normalizedGuess.length!==game.wordLength){socket.emit('error',{message:'Uzunluk hata!'});return;}
+      if(normalizedGuess.length!==game.wordLength){
+        socket.emit('error',{message:'Kelime uzunluğu hatalı!'});
+        return;
+      }
+      
       game.lastActivity=Date.now();
       game.turnNumber++;
+      
       const result=evaluateGuess(normalizedGuess,game.targetWord);
       const won=result.every(r=>r==='correct');
-      playerData.guesses.push({guess:normalizedGuess,result,turnNumber:game.turnNumber,timestamp:Date.now()});
-      socket.emit('game:guess:result',{guess:normalizedGuess,result,won,lost:false,guessCount:playerData.guesses.length});
+      
+      playerData.guesses.push({
+        guess:normalizedGuess,
+        result,
+        turnNumber:game.turnNumber,
+        timestamp:Date.now()
+      });
+      
+      console.log(`✅ Guess processed: ${normalizedGuess} = ${result.join(',')} | Won: ${won}`);
+      
+      // Send result back to the player who guessed
+      socket.emit('game:guess:result',{
+        guess:normalizedGuess,
+        result,
+        won,
+        lost:false,
+        guessCount:playerData.guesses.length
+      });
+      
+      // Get opponent ID
       const opponentId=Object.keys(game.players).find(id=>id!==socket.id);
+      
       if(opponentId){
-        io.to(opponentId).emit('game:opponent:update',{guessCount:playerData.guesses.length,finished:won,won:won});
-        io.to(opponentId).emit('game:opponent:guess',{guess:normalizedGuess,result,opponentWon:won,yourTurn:!won});
-      }
-      if(won){
-        playerData.finished=true;
-        playerData.won=true;
-        endGame(gameId,socket.id);
-        return;
-      }
-      const allGuessesUsed=Object.values(game.players).every(p=>p.guesses.length>=game.maxGuesses);
-      if(allGuessesUsed){
-        endGame(gameId,null);
-        return;
-      }
-      game.currentTurn=opponentId;
-      if(opponentId){
-        io.to(opponentId).emit('game:turn:start',{turnNumber:game.turnNumber,guessesRemaining:game.maxGuesses-game.players[opponentId].guesses.length});
+        // Update opponent about this player's progress
+        io.to(opponentId).emit('game:opponent:update',{
+          guessCount:playerData.guesses.length,
+          finished:won,
+          won:won
+        });
+        
+        // If this player won, end the game
+        if(won){
+          playerData.finished=true;
+          playerData.won=true;
+          console.log(`🏆 ${playerData.nick} won!`);
+          endGame(gameId,socket.id);
+          return;
+        }
+        
+        // Check if all guesses are used
+        const allGuessesUsed=Object.values(game.players).every(p=>p.guesses.length>=game.maxGuesses);
+        if(allGuessesUsed){
+          console.log('🤝 Both players out of guesses - Draw');
+          endGame(gameId,null);
+          return;
+        }
+        
+        // Switch turn to opponent
+        game.currentTurn=opponentId;
+        console.log(`🔄 Turn switched to ${opponentId}`);
+        
+        // Notify opponent it's their turn
+        io.to(opponentId).emit('game:opponent:guess',{
+          guess:normalizedGuess,
+          result,
+          opponentWon:false,
+          yourTurn:true
+        });
+        
+        io.to(opponentId).emit('game:turn:start',{
+          turnNumber:game.turnNumber,
+          guessesRemaining:game.maxGuesses-game.players[opponentId].guesses.length
+        });
       }
     }catch(error){
-      console.error('❌ guess:',error);
+      console.error('❌ Guess error:',error);
       socket.emit('error',{message:'Tahmin hatası!'});
     }
   });
+  
   socket.on('leaderboard:get',()=>{
     try{
       socket.emit('leaderboard:update',{leaderboard:getLeaderboard()});
     }catch(error){
-      console.error('❌ leaderboard:',error);
+      console.error('❌ Leaderboard error:',error);
     }
   });
+  
   socket.on('disconnect',()=>{
-    console.log('🔌❌',socket.id);
+    console.log('🔌❌ Client disconnected:',socket.id);
     try{
       const player=players.get(socket.id);
       if(player&&player.currentGameId){
@@ -360,7 +509,7 @@ io.on('connection',(socket)=>{
       players.delete(socket.id);
       broadcastQueueUpdate();
     }catch(error){
-      console.error('❌ disconnect:',error);
+      console.error('❌ Disconnect error:',error);
     }
   });
 });
@@ -390,23 +539,38 @@ function endGame(gameId,winnerId=null,disconnected=false){
   try{
     const game=activeGames.get(gameId);
     if(!game)return;
+    
+    console.log(`🏁 Ending game ${gameId} | Winner: ${winnerId || 'DRAW'} | Disconnected: ${disconnected}`);
+    
     const playerIds=Object.keys(game.players);
     const isDraw=!winnerId;
+    
     playerIds.forEach(socketId=>{
       const playerData=game.players[socketId];
       const player=players.get(socketId);
       if(!player)return;
+      
       const won=socketId===winnerId;
       const opponentId=playerIds.find(id=>id!==socketId);
       if(!opponentId)return;
+      
       let xpGained=0;
       let rankedChange=0;
+      
       if(isDraw){
         xpGained=30;
         const rankingResult=updateRankedPoints(player.playerId,game.players[opponentId].playerId,true);
         rankedChange=socketId===playerIds[0]?rankingResult.winnerChange:rankingResult.loserChange;
         const{playerData:updatedData,leveledUp}=updatePlayerLevel(player.playerId,xpGained);
-        io.to(socketId).emit('game:end',{result:'draw',targetWord:game.targetWord,xpGained,rankedChange,newRankedPoints:updatedData.rankedPoints,progress:updatedData,leveledUp});
+        io.to(socketId).emit('game:end',{
+          result:'draw',
+          targetWord:game.targetWord,
+          xpGained,
+          rankedChange,
+          newRankedPoints:updatedData.rankedPoints,
+          progress:updatedData,
+          leveledUp
+        });
       }else if(won){
         const fastWinBonus=Math.max(0,(game.maxGuesses-playerData.guesses.length))*15;
         xpGained=100+fastWinBonus;
@@ -414,22 +578,42 @@ function endGame(gameId,winnerId=null,disconnected=false){
         const rankingResult=updateRankedPoints(player.playerId,game.players[opponentId].playerId,false);
         rankedChange=rankingResult.winnerChange;
         const{playerData:updatedData,leveledUp}=updatePlayerLevel(player.playerId,xpGained);
-        io.to(socketId).emit('game:end',{result:'win',targetWord:game.targetWord,xpGained,rankedChange,newRankedPoints:updatedData.rankedPoints,progress:updatedData,leveledUp,disconnected,guessCount:playerData.guesses.length});
+        io.to(socketId).emit('game:end',{
+          result:'win',
+          targetWord:game.targetWord,
+          xpGained,
+          rankedChange,
+          newRankedPoints:updatedData.rankedPoints,
+          progress:updatedData,
+          leveledUp,
+          disconnected,
+          guessCount:playerData.guesses.length
+        });
       }else{
         xpGained=20;
         const rankingResult=updateRankedPoints(game.players[opponentId].playerId,player.playerId,false);
         rankedChange=rankingResult.loserChange;
         const{playerData:updatedData}=updatePlayerLevel(player.playerId,xpGained);
-        io.to(socketId).emit('game:end',{result:'lose',targetWord:game.targetWord,xpGained,rankedChange,newRankedPoints:updatedData.rankedPoints,progress:updatedData,leveledUp:false});
+        io.to(socketId).emit('game:end',{
+          result:'lose',
+          targetWord:game.targetWord,
+          xpGained,
+          rankedChange,
+          newRankedPoints:updatedData.rankedPoints,
+          progress:updatedData,
+          leveledUp:false
+        });
       }
+      
       if(player){player.currentGameId=null;}
     });
+    
     game.status='finished';
     game.endedAt=Date.now();
     setTimeout(()=>{activeGames.delete(gameId);},5000);
-    console.log(`✅ End: ${gameId}`);
+    console.log(`✅ Game ended: ${gameId}`);
   }catch(error){
-    console.error('❌ endGame:',error);
+    console.error('❌ End game error:',error);
   }
 }
 
@@ -438,18 +622,31 @@ setInterval(()=>{
   const timeout=5*60*1000;
   for(const[gameId,game]of activeGames.entries()){
     if(game.status==='active'&&(now-game.lastActivity)>timeout){
-      console.log(`⏰ Timeout: ${gameId}`);
+      console.log(`⏰ Game timeout: ${gameId}`);
       endGame(gameId,null);
     }
   }
 },60000);
 
 app.get('/health',(req,res)=>{
-  res.json({status:'ok',timestamp:Date.now(),players:players.size,queue:queue.size,activeGames:activeGames.size,totalRegistered:Object.keys(persistentPlayers).length});
+  res.json({
+    status:'ok',
+    timestamp:Date.now(),
+    players:players.size,
+    queue:queue.size,
+    activeGames:activeGames.size,
+    totalRegistered:Object.keys(persistentPlayers).length
+  });
 });
 
 app.get('/stats',(req,res)=>{
-  res.json({totalPlayers:players.size,queueSize:queue.size,activeGames:activeGames.size,registeredPlayers:Object.keys(persistentPlayers).length,leaderboardSize:leaderboard.length});
+  res.json({
+    totalPlayers:players.size,
+    queueSize:queue.size,
+    activeGames:activeGames.size,
+    registeredPlayers:Object.keys(persistentPlayers).length,
+    leaderboardSize:leaderboard.length
+  });
 });
 
 app.get('/leaderboard',(req,res)=>{
@@ -468,7 +665,7 @@ const PORT=process.env.PORT||3000;
 server.listen(PORT,()=>{
   console.log(`
 ╔═══════════════════════════════════════╗
-║   🎮 ROODLE SERVER - PRODUCTION 🎮   ║
+║  🎮 ROODLE BY RELAQUENT - SERVER 🎮  ║
 ╠═══════════════════════════════════════╣
 ║  Port: ${PORT.toString().padEnd(30)}║
 ║  Status: ✅ READY                    ║
@@ -478,19 +675,19 @@ server.listen(PORT,()=>{
 });
 
 process.on('SIGTERM',()=>{
-  console.log('⚠️  SIGTERM');
+  console.log('⚠️  SIGTERM received');
   saveData();
   server.close(()=>{
-    console.log('✅ Closed');
+    console.log('✅ Server closed');
     process.exit(0);
   });
 });
 
 process.on('SIGINT',()=>{
-  console.log('⚠️  SIGINT');
+  console.log('⚠️  SIGINT received');
   saveData();
   server.close(()=>{
-    console.log('✅ Closed');
+    console.log('✅ Server closed');
     process.exit(0);
   });
 });
