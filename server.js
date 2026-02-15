@@ -12,38 +12,42 @@ const io = socketIO(server, {
   cors: {
     origin: "*",
     methods: ["GET", "POST"]
-  }
+  },
+  pingTimeout: 60000,
+  pingInterval: 25000,
+  transports: ['websocket', 'polling']
 });
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static('public'));
 
-// ===== PERSISTENT STORAGE =====
+// ===== DATA STORAGE =====
 const DATA_DIR = path.join(__dirname, 'data');
 const PLAYERS_FILE = path.join(DATA_DIR, 'players.json');
 const LEADERBOARD_FILE = path.join(DATA_DIR, 'leaderboard.json');
 
-// Create data directory if it doesn't exist
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
-// Load or initialize data
 let persistentPlayers = {};
 let leaderboard = [];
 
 function loadData() {
   try {
     if (fs.existsSync(PLAYERS_FILE)) {
-      persistentPlayers = JSON.parse(fs.readFileSync(PLAYERS_FILE, 'utf8'));
+      const data = fs.readFileSync(PLAYERS_FILE, 'utf8');
+      persistentPlayers = data ? JSON.parse(data) : {};
     }
     if (fs.existsSync(LEADERBOARD_FILE)) {
-      leaderboard = JSON.parse(fs.readFileSync(LEADERBOARD_FILE, 'utf8'));
+      const data = fs.readFileSync(LEADERBOARD_FILE, 'utf8');
+      leaderboard = data ? JSON.parse(data) : [];
     }
-    console.log('Data loaded successfully');
+    console.log('✅ Data loaded');
   } catch (error) {
-    console.error('Error loading data:', error);
+    console.error('❌ Load error:', error);
+    persistentPlayers = {};
+    leaderboard = [];
   }
 }
 
@@ -52,20 +56,16 @@ function saveData() {
     fs.writeFileSync(PLAYERS_FILE, JSON.stringify(persistentPlayers, null, 2));
     fs.writeFileSync(LEADERBOARD_FILE, JSON.stringify(leaderboard, null, 2));
   } catch (error) {
-    console.error('Error saving data:', error);
+    console.error('❌ Save error:', error);
   }
 }
 
-// Save data periodically
-setInterval(saveData, 30000); // Every 30 seconds
-
-// Load data on startup
+setInterval(saveData, 30000);
 loadData();
 
-// ===== GAME STATE =====
-const players = new Map(); // socketId -> player data
-const queue = new Set(); // waiting players
-const activeGames = new Map(); // gameId -> game data
+const players = new Map();
+const queue = new Map();
+const activeGames = new Map();
 
 // ===== WORD LISTS =====
 const WORD_LISTS = {
@@ -75,636 +75,422 @@ const WORD_LISTS = {
   7: ["ANAYASA", "BELEDİYE", "ÇİSANTİ", "DİLEKÇE", "EMİRGAN", "FASULYE", "GÖKYÜZÜ", "HAKARET", "ISPANAK", "İSKELET", "JANDARMA", "KABURGA", "LOKANTA", "MERHABA", "NAKLİYE", "OKYANUS", "PENCERE", "RANDEVU", "SANDALYE", "ŞAMPUAN", "TELEFON", "UYGULAMA", "VAZİYET", "YUMURTA", "ZAFİYET", "AHTAPOT", "BAŞKENT", "CESARET", "DENEYİM", "EĞLENCE", "FABRİKA", "GÖSTERİ", "HASTANE", "IHLAMUR", "İSTİDAT", "KAVANOZ", "LAVANTA", "MİSAFİR", "NUMARAL", "OYUNCU", "PIRLANTA", "REFAHAT", "SAYGILI", "ŞAŞIRMA", "TİYATRO", "UZUNLUK", "VERİMLİ", "YETENEK", "ZORUNLU", "AMBALAJ", "BERABER", "COĞRAFA", "DÜŞÜNCE", "EMNİYET", "FESTİVAL", "GÖRÜNTÜ", "HAYSİYET", "ISIRGAN", "İLGİNÇTİ", "KAZANIM", "LEVREKL", "MUTLULU", "NAMUSLU", "OTOMATİK", "PANAYIR", "REKABET", "SİNEMACI", "ŞAKAYIK", "TEMİZLİK", "UZMANLA", "VALİZLE", "YAZILIM", "ZENGİNL", "AKTARIM", "BİSİKLET", "ÇERÇEVE", "DEĞİRMEN", "EFSANEVİ", "FELAKET", "GİRİŞİM", "HAYALET", "ISMARLA", "İMTİHAN", "KARANFİL", "LİMONATA", "MALİYET", "NİŞASTA", "OKSİJEN", "PERŞEMBE", "SAMİMİYET", "ŞEHİRLİ", "TARTIŞMA", "ÜRETİCİ", "VARİSÇİ", "YIKILMA", "ZABITALA", "ANLAYIŞ", "BAĞLAMA", "CEPHANE", "DÜZENLİ", "EKSİKLİK", "FERAHLIK", "GÖREVLİ", "HAREKET", "IŞILDAK", "İÇECEKLİ", "KONTROL", "LÜBEYYE", "MİLYARD", "NEZAKET", "ORDUEVİ", "PATATES", "REÇETELİ", "SÜREKLİ", "ŞİKAYET", "TOPLANTI", "ÜZÜNTÜLÜ", "VİCDANLI", "YÖNETİM", "ZÜMRÜT", "ALTYAPI", "BULANIK", "CÖMERTLİK", "DÜZELTME", "ELBİSELİ", "FAALİYET", "GÜNEŞLİ", "HAZİNEM", "İLANLAR", "KÜLTÜRLÜ", "MADALYA", "NİTELİK", "OYUNCAK", "PORSİYON", "REHBERLİK", "SEVİYELİ", "ŞAHSİYET", "TAMİRAT", "UYARICI", "VAKİTLİ", "YARATIK", "ZİYARET", "ASİSTAN", "BÖLGESEL", "ÇALIŞKAN", "DİNAMİK", "EĞİTMEN", "FOTOĞRAF", "GÖREVDE", "HAVADİS", "ISIRMAK", "İLETİŞİM", "KAPTANLI", "LAVABOLU", "MANTARLI", "NÖBETÇİ", "OTURMAK", "PARLAMA", "REKORCU", "SATIŞLAR", "ŞAŞIRTMA", "TASARIM", "ÜYELİKLER", "VALİZLER", "YAZILIM", "ZAMANDA", "AVUKATLIK", "BİLDİRİM", "ÇEVRECİ", "DİKKATLİ", "EKİPMAN", "FIKRAAN", "GÜLERİZ", "HAYIRLI", "İSABETLİ", "KAPASİTE", "LAHMACUN", "MERİNOS", "NUMARALI", "ORMANCI", "PANDÜL", "SESSİZLİK", "TECRÜBE", "VİRGÜLLÜ", "YETKİLİ", "ZIMBALI", "ÇİZGİLİ", "DERLEME", "SATILIK", "FARKSIZ", "SABANCI", "HASIRCI"]
 };
 
-// ===== RANK SYSTEM =====
 const RANKS = {
-  1: { name: "Yeni Doğmuş I", xpNeeded: 100 },
-  2: { name: "Yeni Doğmuş II", xpNeeded: 150 },
-  3: { name: "Yeni Doğmuş III", xpNeeded: 200 },
-  4: { name: "Yeni Doğmuş IV", xpNeeded: 250 },
-  5: { name: "Yeni Doğmuş V", xpNeeded: 300 },
-  6: { name: "Amatör I", xpNeeded: 400 },
-  7: { name: "Amatör II", xpNeeded: 500 },
-  8: { name: "Amatör III", xpNeeded: 600 },
-  9: { name: "Amatör IV", xpNeeded: 700 },
-  10: { name: "Bilirkişi I", xpNeeded: 850 },
-  11: { name: "Bilirkişi II", xpNeeded: 1000 },
-  12: { name: "Bilirkişi III", xpNeeded: 1200 },
-  13: { name: "Bilirkişi IV", xpNeeded: 1400 },
-  14: { name: "Bilirkişi V", xpNeeded: 1600 },
-  15: { name: "Usta I", xpNeeded: 1850 },
-  16: { name: "Usta II", xpNeeded: 2100 },
-  17: { name: "Usta III", xpNeeded: 2400 },
-  18: { name: "Usta IV", xpNeeded: 2700 },
-  19: { name: "Usta V", xpNeeded: 3000 },
-  20: { name: "General I", xpNeeded: 3400 },
-  21: { name: "General II", xpNeeded: 3800 },
-  22: { name: "General III", xpNeeded: 4300 },
-  23: { name: "General IV", xpNeeded: 4800 },
-  24: { name: "General V", xpNeeded: 5400 },
-  25: { name: "CEO I", xpNeeded: 6000 },
-  26: { name: "CEO II", xpNeeded: 6700 },
-  27: { name: "CEO III", xpNeeded: 7500 },
-  28: { name: "CEO IV", xpNeeded: 8400 },
-  29: { name: "CEO V", xpNeeded: 9400 },
-  30: { name: "Görmüş Geçirmiş", xpNeeded: 10500 }
+  1:{name:"Yeni Doğmuş I",xpNeeded:100},2:{name:"Yeni Doğmuş II",xpNeeded:150},3:{name:"Yeni Doğmuş III",xpNeeded:200},4:{name:"Yeni Doğmuş IV",xpNeeded:250},5:{name:"Yeni Doğmuş V",xpNeeded:300},6:{name:"Amatör I",xpNeeded:400},7:{name:"Amatör II",xpNeeded:500},8:{name:"Amatör III",xpNeeded:600},9:{name:"Amatör IV",xpNeeded:700},10:{name:"Bilirkişi I",xpNeeded:850},11:{name:"Bilirkişi II",xpNeeded:1000},12:{name:"Bilirkişi III",xpNeeded:1200},13:{name:"Bilirkişi IV",xpNeeded:1400},14:{name:"Bilirkişi V",xpNeeded:1600},15:{name:"Usta I",xpNeeded:1850},16:{name:"Usta II",xpNeeded:2100},17:{name:"Usta III",xpNeeded:2400},18:{name:"Usta IV",xpNeeded:2700},19:{name:"Usta V",xpNeeded:3000},20:{name:"General I",xpNeeded:3400},21:{name:"General II",xpNeeded:3800},22:{name:"General III",xpNeeded:4300},23:{name:"General IV",xpNeeded:4800},24:{name:"General V",xpNeeded:5400},25:{name:"CEO I",xpNeeded:6000},26:{name:"CEO II",xpNeeded:6700},27:{name:"CEO III",xpNeeded:7500},28:{name:"CEO IV",xpNeeded:8400},29:{name:"CEO V",xpNeeded:9400},30:{name:"Görmüş Geçirmiş",xpNeeded:10500}
 };
 
-for (let i = 31; i <= 100; i++) {
-  RANKS[i] = { name: "Görmüş Geçirmiş", xpNeeded: RANKS[i-1].xpNeeded + 1200 };
+for(let i=31;i<=100;i++){
+  RANKS[i]={name:"Görmüş Geçirmiş",xpNeeded:RANKS[i-1].xpNeeded+1200};
 }
 
-// ===== HELPER FUNCTIONS =====
-function getRandomWord(length) {
-  const list = WORD_LISTS[length];
-  return list[Math.floor(Math.random() * list.length)];
+function getRandomWord(length){
+  const list=WORD_LISTS[length];
+  if(!list||list.length===0)return null;
+  return list[Math.floor(Math.random()*list.length)];
 }
 
-function generateGameId() {
-  return `game_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+function generateGameId(){
+  return `game_${Date.now()}_${Math.random().toString(36).substr(2,9)}`;
 }
 
-function coinFlip() {
-  return Math.random() < 0.5;
+function coinFlip(){
+  return Math.random()<0.5;
 }
 
-function getPlayerData(playerId) {
-  if (!persistentPlayers[playerId]) {
-    persistentPlayers[playerId] = {
-      playerId,
-      totalXP: 0,
-      level: 1,
-      currentXP: 0,
-      wins: 0,
-      losses: 0,
-      draws: 0,
-      gamesPlayed: 0,
-      rankedPoints: 1000, // Starting ELO-like rating
-      highestRank: 1000,
-      winStreak: 0,
-      bestWinStreak: 0
-    };
+function getPlayerData(playerId){
+  if(!persistentPlayers[playerId]){
+    persistentPlayers[playerId]={playerId,totalXP:0,level:1,currentXP:0,wins:0,losses:0,draws:0,gamesPlayed:0,rankedPoints:1000,highestRank:1000,winStreak:0,bestWinStreak:0,lastSeen:Date.now()};
   }
+  persistentPlayers[playerId].lastSeen=Date.now();
   return persistentPlayers[playerId];
 }
 
-function updatePlayerLevel(playerId, xpGained) {
-  let playerData = getPlayerData(playerId);
-
-  playerData.totalXP += xpGained;
-  playerData.currentXP += xpGained;
-
-  let leveledUp = false;
-  while (playerData.level < 100) {
-    const nextRank = RANKS[playerData.level + 1];
-    if (playerData.totalXP >= nextRank.xpNeeded) {
+function updatePlayerLevel(playerId,xpGained){
+  let playerData=getPlayerData(playerId);
+  playerData.totalXP+=xpGained;
+  playerData.currentXP+=xpGained;
+  let leveledUp=false;
+  while(playerData.level<100){
+    const nextRank=RANKS[playerData.level+1];
+    if(playerData.totalXP>=nextRank.xpNeeded){
       playerData.level++;
-      playerData.currentXP = 0;
-      leveledUp = true;
-    } else {
+      playerData.currentXP=0;
+      leveledUp=true;
+    }else break;
+  }
+  playerData.rank=RANKS[playerData.level].name;
+  persistentPlayers[playerId]=playerData;
+  saveData();
+  return{playerData,leveledUp};
+}
+
+function updateRankedPoints(winnerId,loserId,isDraw=false){
+  const winnerData=getPlayerData(winnerId);
+  const loserData=getPlayerData(loserId);
+  const K=32;
+  const expectedWinner=1/(1+Math.pow(10,(loserData.rankedPoints-winnerData.rankedPoints)/400));
+  const expectedLoser=1/(1+Math.pow(10,(winnerData.rankedPoints-loserData.rankedPoints)/400));
+  let winnerChange=0;
+  let loserChange=0;
+  if(isDraw){
+    winnerChange=Math.round(K*(0.5-expectedWinner));
+    loserChange=Math.round(K*(0.5-expectedLoser));
+    winnerData.rankedPoints+=winnerChange;
+    loserData.rankedPoints+=loserChange;
+    winnerData.draws++;
+    loserData.draws++;
+  }else{
+    winnerChange=Math.round(K*(1-expectedWinner));
+    loserChange=Math.round(K*(0-expectedLoser));
+    winnerData.rankedPoints+=winnerChange;
+    loserData.rankedPoints+=loserChange;
+    winnerData.wins++;
+    winnerData.winStreak++;
+    winnerData.bestWinStreak=Math.max(winnerData.bestWinStreak,winnerData.winStreak);
+    loserData.losses++;
+    loserData.winStreak=0;
+  }
+  winnerData.highestRank=Math.max(winnerData.highestRank,winnerData.rankedPoints);
+  loserData.highestRank=Math.max(loserData.highestRank,loserData.rankedPoints);
+  winnerData.gamesPlayed++;
+  loserData.gamesPlayed++;
+  persistentPlayers[winnerId]=winnerData;
+  persistentPlayers[loserId]=loserData;
+  updateLeaderboard(winnerId);
+  updateLeaderboard(loserId);
+  saveData();
+  return{winnerPoints:winnerData.rankedPoints,loserPoints:loserData.rankedPoints,winnerChange:winnerChange,loserChange:loserChange};
+}
+
+function updateLeaderboard(playerId){
+  const playerData=getPlayerData(playerId);
+  let currentNick='Oyuncu';
+  for(const[socketId,player]of players.entries()){
+    if(player.playerId===playerId){
+      currentNick=player.nick;
       break;
     }
   }
-
-  persistentPlayers[playerId] = playerData;
-  saveData();
-  
-  return { playerData, leveledUp };
-}
-
-function updateRankedPoints(winner, loser, isDraw = false) {
-  const winnerData = getPlayerData(winner);
-  const loserData = getPlayerData(loser);
-
-  const K = 32; // K-factor for ELO
-  const expectedWinner = 1 / (1 + Math.pow(10, (loserData.rankedPoints - winnerData.rankedPoints) / 400));
-  const expectedLoser = 1 / (1 + Math.pow(10, (winnerData.rankedPoints - loserData.rankedPoints) / 400));
-
-  if (isDraw) {
-    winnerData.rankedPoints += Math.round(K * (0.5 - expectedWinner));
-    loserData.rankedPoints += Math.round(K * (0.5 - expectedLoser));
-    winnerData.draws++;
-    loserData.draws++;
-  } else {
-    const winnerChange = Math.round(K * (1 - expectedWinner));
-    const loserChange = Math.round(K * (0 - expectedLoser));
-    
-    winnerData.rankedPoints += winnerChange;
-    loserData.rankedPoints += loserChange;
-    
-    winnerData.wins++;
-    winnerData.winStreak++;
-    winnerData.bestWinStreak = Math.max(winnerData.bestWinStreak, winnerData.winStreak);
-    
-    loserData.losses++;
-    loserData.winStreak = 0;
-  }
-
-  winnerData.highestRank = Math.max(winnerData.highestRank, winnerData.rankedPoints);
-  loserData.highestRank = Math.max(loserData.highestRank, loserData.rankedPoints);
-
-  winnerData.gamesPlayed++;
-  loserData.gamesPlayed++;
-
-  persistentPlayers[winner] = winnerData;
-  persistentPlayers[loser] = loserData;
-  
-  updateLeaderboard(winner);
-  updateLeaderboard(loser);
-  
-  saveData();
-
-  return {
-    winnerPoints: winnerData.rankedPoints,
-    loserPoints: loserData.rankedPoints,
-    winnerChange: isDraw ? Math.round(K * (0.5 - expectedWinner)) : Math.round(K * (1 - expectedWinner)),
-    loserChange: isDraw ? Math.round(K * (0.5 - expectedLoser)) : Math.round(K * (0 - expectedLoser))
-  };
-}
-
-function updateLeaderboard(playerId) {
-  const playerData = getPlayerData(playerId);
-  
-  const existingIndex = leaderboard.findIndex(p => p.playerId === playerId);
-  
-  const leaderboardEntry = {
-    playerId: playerData.playerId,
-    nick: players.get(Object.keys(players).find(k => players.get(k)?.playerId === playerId))?.nick || 'Oyuncu',
-    rankedPoints: playerData.rankedPoints,
-    level: playerData.level,
-    wins: playerData.wins,
-    losses: playerData.losses,
-    draws: playerData.draws,
-    gamesPlayed: playerData.gamesPlayed,
-    winStreak: playerData.winStreak
-  };
-
-  if (existingIndex >= 0) {
-    leaderboard[existingIndex] = leaderboardEntry;
-  } else {
+  const existingIndex=leaderboard.findIndex(p=>p.playerId===playerId);
+  const leaderboardEntry={playerId:playerData.playerId,nick:currentNick,rankedPoints:playerData.rankedPoints,level:playerData.level,rank:playerData.rank||RANKS[playerData.level].name,wins:playerData.wins,losses:playerData.losses,draws:playerData.draws,gamesPlayed:playerData.gamesPlayed,winStreak:playerData.winStreak};
+  if(existingIndex>=0){
+    leaderboard[existingIndex]=leaderboardEntry;
+  }else{
     leaderboard.push(leaderboardEntry);
   }
-
-  // Sort by ranked points
-  leaderboard.sort((a, b) => b.rankedPoints - a.rankedPoints);
-  
-  // Keep top 100
-  if (leaderboard.length > 100) {
-    leaderboard = leaderboard.slice(0, 100);
+  leaderboard.sort((a,b)=>b.rankedPoints-a.rankedPoints);
+  if(leaderboard.length>100){
+    leaderboard=leaderboard.slice(0,100);
   }
-  
   saveData();
 }
 
-function getLeaderboard() {
-  return leaderboard.slice(0, 50);
+function getLeaderboard(){
+  return leaderboard.slice(0,50);
 }
 
-function tryMatchPlayers() {
-  if (queue.size < 2) return;
+function tryMatchPlayers(){
+  if(queue.size<2)return;
+  const queueArray=Array.from(queue.entries());
+  for(let i=0;i<queueArray.length-1;i++){
+    const[player1Id,player1Pref]=queueArray[i];
+    for(let j=i+1;j<queueArray.length;j++){
+      const[player2Id,player2Pref]=queueArray[j];
+      if(player1Pref.wordLength===player2Pref.wordLength||player1Pref.wordLength===0||player2Pref.wordLength===0){
+        const player1=players.get(player1Id);
+        const player2=players.get(player2Id);
+        if(!player1||!player2)continue;
+        createMatch(player1Id,player2Id,player1Pref.wordLength||player2Pref.wordLength||5);
+        return;
+      }
+    }
+  }
+  if(queueArray.length>=2){
+    const[player1Id,player1Pref]=queueArray[0];
+    const[player2Id,player2Pref]=queueArray[1];
+    const player1=players.get(player1Id);
+    const player2=players.get(player2Id);
+    if(player1&&player2){
+      createMatch(player1Id,player2Id,player1Pref.wordLength||player2Pref.wordLength||5);
+    }
+  }
+}
 
-  const queueArray = Array.from(queue);
-  
-  // Simple matchmaking: take first two players
-  const player1Id = queueArray[0];
-  const player2Id = queueArray[1];
-
-  const player1 = players.get(player1Id);
-  const player2 = players.get(player2Id);
-
-  if (!player1 || !player2) return;
-
-  // Remove from queue
+function createMatch(player1Id,player2Id,wordLength){
+  const player1=players.get(player1Id);
+  const player2=players.get(player2Id);
+  if(!player1||!player2)return;
   queue.delete(player1Id);
   queue.delete(player2Id);
-
-  // Create game
-  const gameId = generateGameId();
-  const wordLength = player1.preferredLength || 5;
-  const targetWord = getRandomWord(wordLength);
-  const firstPlayer = coinFlip() ? player1Id : player2Id;
-
-  const game = {
-    gameId,
-    targetWord,
-    wordLength,
-    players: {
-      [player1Id]: {
-        playerId: player1.playerId,
-        nick: player1.nick,
-        guesses: [],
-        finished: false,
-        won: false
-      },
-      [player2Id]: {
-        playerId: player2.playerId,
-        nick: player2.nick,
-        guesses: [],
-        finished: false,
-        won: false
-      }
-    },
-    currentTurn: firstPlayer,
-    turnNumber: 0,
-    maxGuesses: 6,
-    status: 'active',
-    createdAt: Date.now(),
-    allGuesses: []
-  };
-
-  activeGames.set(gameId, game);
-
-  player1.currentGameId = gameId;
-  player2.currentGameId = gameId;
-
-  console.log(`Game created: ${gameId} - ${player1.nick} vs ${player2.nick} - First: ${firstPlayer === player1Id ? player1.nick : player2.nick}`);
-
-  // Notify both players
-  io.to(player1Id).emit('game:start', {
-    gameId,
-    wordLength,
-    opponent: { nick: player2.nick, level: player2.level },
-    yourTurn: firstPlayer === player1Id
-  });
-
-  io.to(player2Id).emit('game:start', {
-    gameId,
-    wordLength,
-    opponent: { nick: player1.nick, level: player1.level },
-    yourTurn: firstPlayer === player2Id
-  });
-
-  // Broadcast updated queue
+  const gameId=generateGameId();
+  const targetWord=getRandomWord(wordLength);
+  if(!targetWord){
+    console.error(`No word for length ${wordLength}`);
+    queue.set(player1Id,{wordLength,joinedAt:Date.now()});
+    queue.set(player2Id,{wordLength,joinedAt:Date.now()});
+    return;
+  }
+  const firstPlayer=coinFlip()?player1Id:player2Id;
+  const game={gameId,targetWord,wordLength,players:{[player1Id]:{playerId:player1.playerId,nick:player1.nick,level:player1.level,guesses:[],finished:false,won:false},[player2Id]:{playerId:player2.playerId,nick:player2.nick,level:player2.level,guesses:[],finished:false,won:false}},currentTurn:firstPlayer,turnNumber:0,maxGuesses:6,status:'active',createdAt:Date.now(),lastActivity:Date.now()};
+  activeGames.set(gameId,game);
+  player1.currentGameId=gameId;
+  player2.currentGameId=gameId;
+  console.log(`🎮 ${gameId}|${player1.nick} vs ${player2.nick}|${targetWord}`);
+  io.to(player1Id).emit('game:start',{gameId,wordLength,opponent:{nick:player2.nick,level:player2.level,rank:getPlayerData(player2.playerId).rank},yourTurn:firstPlayer===player1Id});
+  io.to(player2Id).emit('game:start',{gameId,wordLength,opponent:{nick:player1.nick,level:player1.level,rank:getPlayerData(player1.playerId).rank},yourTurn:firstPlayer===player2Id});
   broadcastQueueUpdate();
 }
 
-function broadcastQueueUpdate() {
-  const queuePlayers = Array.from(queue).map(socketId => {
-    const player = players.get(socketId);
-    return player ? {
-      nick: player.nick,
-      level: player.level,
-      rank: player.rank
-    } : null;
+function broadcastQueueUpdate(){
+  const queuePlayers=Array.from(queue.keys()).map(socketId=>{
+    const player=players.get(socketId);
+    return player?{nick:player.nick,level:player.level,rank:getPlayerData(player.playerId).rank}:null;
   }).filter(Boolean);
-
-  io.emit('queue:update', { players: queuePlayers });
+  io.emit('queue:update',{players:queuePlayers});
 }
 
-// ===== SOCKET EVENTS =====
-io.on('connection', (socket) => {
-  console.log('New connection:', socket.id);
-
-  // Player registration
-  socket.on('player:register', (data) => {
-    const { playerId, nick, level, rank, preferredLength } = data;
-    
-    const storedData = getPlayerData(playerId || socket.id);
-    
-    players.set(socket.id, {
-      socketId: socket.id,
-      playerId: playerId || socket.id,
-      nick: nick || 'Oyuncu',
-      level: storedData.level || level || 1,
-      rank: storedData.rank || rank || 'Yeni Doğmuş I',
-      preferredLength: preferredLength || 5,
-      currentGameId: null,
-      connectedAt: Date.now()
-    });
-
-    socket.emit('player:registered', {
-      playerId: playerId || socket.id,
-      progress: storedData
-    });
-
-    console.log(`Player registered: ${nick} (${socket.id})`);
-  });
-
-  // Queue management
-  socket.on('queue:join', (data) => {
-    const player = players.get(socket.id);
-    if (!player) {
-      socket.emit('error', { message: 'Önce kayıt olmalısınız!' });
-      return;
-    }
-
-    if (queue.has(socket.id)) {
-      socket.emit('error', { message: 'Zaten sıradasınız!' });
-      return;
-    }
-
-    if (data.wordLength) {
-      player.preferredLength = data.wordLength;
-    }
-
-    queue.add(socket.id);
-    socket.emit('queue:joined', { position: queue.size });
-    
-    console.log(`Player joined queue: ${player.nick} - Queue size: ${queue.size}`);
-    
-    broadcastQueueUpdate();
-    tryMatchPlayers();
-  });
-
-  socket.on('queue:leave', () => {
-    queue.delete(socket.id);
-    socket.emit('queue:left');
-    broadcastQueueUpdate();
-    console.log(`Player left queue: ${socket.id} - Queue size: ${queue.size}`);
-  });
-
-  // Game actions
-  socket.on('game:guess', (data) => {
-    const { gameId, guess } = data;
-    const game = activeGames.get(gameId);
-    
-    if (!game || game.status !== 'active') {
-      socket.emit('error', { message: 'Oyun bulunamadı!' });
-      return;
-    }
-
-    // DÜZELTME: Sıra kontrolü doğru yapılıyor
-    if (game.currentTurn !== socket.id) {
-      socket.emit('error', { message: 'Senin sıran değil!' });
-      return;
-    }
-
-    const playerData = game.players[socket.id];
-    if (!playerData || playerData.finished) {
-      socket.emit('error', { message: 'Bu oyunda aktif değilsiniz!' });
-      return;
-    }
-
-    game.turnNumber++;
-    const result = evaluateGuess(guess.toUpperCase(), game.targetWord);
-    const won = result.every(r => r === 'correct');
-
-    playerData.guesses.push({ guess: guess.toUpperCase(), result });
-    game.allGuesses.push({
-      player: playerData.nick,
-      guess: guess.toUpperCase(),
-      result,
-      turn: game.turnNumber
-    });
-
-    // Send result to current player
-    socket.emit('game:guess:result', {
-      guess: guess.toUpperCase(),
-      result,
-      won,
-      lost: false
-    });
-
-    // Send opponent update
-    const opponentId = Object.keys(game.players).find(id => id !== socket.id);
-    if (opponentId) {
-      io.to(opponentId).emit('game:opponent:guess', {
-        guess: guess.toUpperCase(),
-        result,
-        opponentWon: won,
-        yourTurn: won ? false : true // DÜZELTME: Rakip kazandıysa sıra yok, kazanmadıysa sıra rakipte
-      });
-    }
-
-    // Check win condition
-    if (won) {
-      playerData.finished = true;
-      playerData.won = true;
-      endGame(gameId, socket.id);
-      return;
-    }
-
-    // Check if game should continue or end in draw
-    if (game.turnNumber >= game.maxGuesses * 2) { // Her oyuncu 6 tahmin
-      endGame(gameId, null); // Draw
-      return;
-    }
-
-    // DÜZELTME: Sırayı doğru değiştir
-    game.currentTurn = opponentId;
-    
-    // Rakibe sıranın geldiğini bildir
-    if (opponentId) {
-      io.to(opponentId).emit('game:turn:start', {
-        turnNumber: game.turnNumber,
-        guessesRemaining: (game.maxGuesses * 2) - game.turnNumber
-      });
+io.on('connection',(socket)=>{
+  console.log('🔌',socket.id);
+  socket.on('player:register',(data)=>{
+    try{
+      const{playerId,nick,level,preferredLength}=data;
+      const storedData=getPlayerData(playerId||socket.id);
+      players.set(socket.id,{socketId:socket.id,playerId:playerId||socket.id,nick:(nick||'Oyuncu').substring(0,16),level:storedData.level||level||1,rank:storedData.rank||RANKS[storedData.level||1].name,preferredLength:preferredLength||5,currentGameId:null,connectedAt:Date.now()});
+      socket.emit('player:registered',{playerId:playerId||socket.id,progress:storedData});
+      console.log(`✅ ${nick}(${socket.id})`);
+    }catch(error){
+      console.error('❌ register:',error);
+      socket.emit('error',{message:'Kayıt hatası!'});
     }
   });
-
-  // Get leaderboard
-  socket.on('leaderboard:get', () => {
-    socket.emit('leaderboard:update', {
-      leaderboard: getLeaderboard()
-    });
+  socket.on('queue:join',(data)=>{
+    try{
+      const player=players.get(socket.id);
+      if(!player){socket.emit('error',{message:'Önce kayıt!'});return;}
+      if(queue.has(socket.id)){socket.emit('error',{message:'Zaten sıradasınız!'});return;}
+      const wordLength=data.preferredLength||player.preferredLength||5;
+      if(!WORD_LISTS[wordLength]||WORD_LISTS[wordLength].length===0){socket.emit('error',{message:'Bu uzunluk desteklenmiyor!'});return;}
+      queue.set(socket.id,{wordLength:wordLength,joinedAt:Date.now()});
+      socket.emit('queue:joined',{position:queue.size});
+      console.log(`🎯 ${player.nick}->${queue.size}`);
+      broadcastQueueUpdate();
+      setTimeout(()=>tryMatchPlayers(),100);
+    }catch(error){
+      console.error('❌ queue:join:',error);
+      socket.emit('error',{message:'Sıra hatası!'});
+    }
   });
-
-  // Request progress
-  socket.on('player:progress:get', (data) => {
-    const playerId = data.playerId || socket.id;
-    const progress = getPlayerData(playerId);
-    socket.emit('player:progress:update', { progress });
+  socket.on('queue:leave',()=>{
+    try{
+      queue.delete(socket.id);
+      socket.emit('queue:left');
+      broadcastQueueUpdate();
+      console.log(`⬅️ ${socket.id}`);
+    }catch(error){
+      console.error('❌ queue:leave:',error);
+    }
   });
-
-  // Disconnect
-  socket.on('disconnect', () => {
-    console.log('Player disconnected:', socket.id);
-    
-    const player = players.get(socket.id);
-    if (player && player.currentGameId) {
-      const game = activeGames.get(player.currentGameId);
-      if (game && game.status === 'active') {
-        const opponentId = Object.keys(game.players).find(id => id !== socket.id);
-        if (opponentId) {
-          io.to(opponentId).emit('game:opponent:disconnected');
-          
-          // Award win to opponent
-          endGame(player.currentGameId, opponentId, true);
-        }
-        
-        activeGames.delete(player.currentGameId);
+  socket.on('game:guess',(data)=>{
+    try{
+      const{gameId,guess}=data;
+      if(!guess||typeof guess!=='string'){socket.emit('error',{message:'Geçersiz!'});return;}
+      const game=activeGames.get(gameId);
+      if(!game||game.status!=='active'){socket.emit('error',{message:'Oyun yok!'});return;}
+      if(game.currentTurn!==socket.id){socket.emit('error',{message:'Sıran değil!'});return;}
+      const playerData=game.players[socket.id];
+      if(!playerData||playerData.finished){socket.emit('error',{message:'Aktif değil!'});return;}
+      const normalizedGuess=guess.toUpperCase().trim();
+      if(normalizedGuess.length!==game.wordLength){socket.emit('error',{message:'Uzunluk hata!'});return;}
+      game.lastActivity=Date.now();
+      game.turnNumber++;
+      const result=evaluateGuess(normalizedGuess,game.targetWord);
+      const won=result.every(r=>r==='correct');
+      playerData.guesses.push({guess:normalizedGuess,result,turnNumber:game.turnNumber,timestamp:Date.now()});
+      socket.emit('game:guess:result',{guess:normalizedGuess,result,won,lost:false,guessCount:playerData.guesses.length});
+      const opponentId=Object.keys(game.players).find(id=>id!==socket.id);
+      if(opponentId){
+        io.to(opponentId).emit('game:opponent:update',{guessCount:playerData.guesses.length,finished:won,won:won});
+        io.to(opponentId).emit('game:opponent:guess',{guess:normalizedGuess,result,opponentWon:won,yourTurn:!won});
       }
+      if(won){
+        playerData.finished=true;
+        playerData.won=true;
+        endGame(gameId,socket.id);
+        return;
+      }
+      const allGuessesUsed=Object.values(game.players).every(p=>p.guesses.length>=game.maxGuesses);
+      if(allGuessesUsed){
+        endGame(gameId,null);
+        return;
+      }
+      game.currentTurn=opponentId;
+      if(opponentId){
+        io.to(opponentId).emit('game:turn:start',{turnNumber:game.turnNumber,guessesRemaining:game.maxGuesses-game.players[opponentId].guesses.length});
+      }
+    }catch(error){
+      console.error('❌ guess:',error);
+      socket.emit('error',{message:'Tahmin hatası!'});
     }
-    
-    queue.delete(socket.id);
-    players.delete(socket.id);
+  });
+  socket.on('leaderboard:get',()=>{
+    try{
+      socket.emit('leaderboard:update',{leaderboard:getLeaderboard()});
+    }catch(error){
+      console.error('❌ leaderboard:',error);
+    }
+  });
+  socket.on('disconnect',()=>{
+    console.log('🔌❌',socket.id);
+    try{
+      const player=players.get(socket.id);
+      if(player&&player.currentGameId){
+        const game=activeGames.get(player.currentGameId);
+        if(game&&game.status==='active'){
+          const opponentId=Object.keys(game.players).find(id=>id!==socket.id);
+          if(opponentId){
+            io.to(opponentId).emit('game:opponent:disconnected',{message:'Rakibiniz ayrıldı!'});
+            endGame(player.currentGameId,opponentId,true);
+          }else{
+            game.status='abandoned';
+            activeGames.delete(player.currentGameId);
+          }
+        }
+      }
+      queue.delete(socket.id);
+      players.delete(socket.id);
+      broadcastQueueUpdate();
+    }catch(error){
+      console.error('❌ disconnect:',error);
+    }
   });
 });
 
-// ===== GAME LOGIC =====
-function evaluateGuess(guess, target) {
-  const result = Array(target.length).fill('absent');
-  const targetArr = target.split('');
-  const guessArr = guess.split('');
-  const targetCount = {};
-
-  targetArr.forEach(l => targetCount[l] = (targetCount[l] || 0) + 1);
-
-  for (let i = 0; i < target.length; i++) {
-    if (guessArr[i] === targetArr[i]) {
-      result[i] = 'correct';
+function evaluateGuess(guess,target){
+  const result=Array(target.length).fill('absent');
+  const targetArr=target.split('');
+  const guessArr=guess.split('');
+  const targetCount={};
+  targetArr.forEach(l=>targetCount[l]=(targetCount[l]||0)+1);
+  for(let i=0;i<target.length;i++){
+    if(guessArr[i]===targetArr[i]){
+      result[i]='correct';
       targetCount[guessArr[i]]--;
     }
   }
-
-  for (let i = 0; i < target.length; i++) {
-    if (result[i] === 'absent' && targetCount[guessArr[i]] > 0) {
-      result[i] = 'present';
+  for(let i=0;i<target.length;i++){
+    if(result[i]==='absent'&&targetCount[guessArr[i]]>0){
+      result[i]='present';
       targetCount[guessArr[i]]--;
     }
   }
-
   return result;
 }
 
-function endGame(gameId, winnerId = null, disconnected = false) {
-  const game = activeGames.get(gameId);
-  if (!game) return;
-
-  const playerIds = Object.keys(game.players);
-  const isDraw = !winnerId;
-
-  playerIds.forEach(socketId => {
-    const playerData = game.players[socketId];
-    const player = players.get(socketId);
-    
-    if (!player) return;
-
-    const won = socketId === winnerId;
-    const isWinner = won;
-    const opponentId = playerIds.find(id => id !== socketId);
-    
-    let xpGained = 0;
-    let rankedChange = 0;
-
-    if (isDraw) {
-      // Draw
-      xpGained = 30;
-      const rankingResult = updateRankedPoints(player.playerId, game.players[opponentId].playerId, true);
-      rankedChange = socketId === playerIds[0] ? rankingResult.winnerChange : rankingResult.loserChange;
-      
-      const { playerData: updatedData, leveledUp } = updatePlayerLevel(player.playerId, xpGained);
-      
-      io.to(socketId).emit('game:end', {
-        result: 'draw',
-        targetWord: game.targetWord,
-        xpGained,
-        rankedChange,
-        newRankedPoints: updatedData.rankedPoints,
-        progress: updatedData,
-        leveledUp,
-        allGuesses: game.allGuesses
-      });
-    } else if (isWinner) {
-      // Winner
-      xpGained = 100 + (game.maxGuesses - Math.floor(game.turnNumber / 2)) * 10; // Bonus for quick win
-      const rankingResult = updateRankedPoints(player.playerId, game.players[opponentId].playerId, false);
-      rankedChange = rankingResult.winnerChange;
-      
-      const { playerData: updatedData, leveledUp } = updatePlayerLevel(player.playerId, xpGained);
-      
-      io.to(socketId).emit('game:end', {
-        result: 'win',
-        targetWord: game.targetWord,
-        xpGained,
-        rankedChange,
-        newRankedPoints: updatedData.rankedPoints,
-        progress: updatedData,
-        leveledUp,
-        disconnected,
-        allGuesses: game.allGuesses
-      });
-    } else {
-      // Loser
-      xpGained = 20;
-      const rankingResult = updateRankedPoints(game.players[opponentId].playerId, player.playerId, false);
-      rankedChange = rankingResult.loserChange;
-      
-      const { playerData: updatedData } = updatePlayerLevel(player.playerId, xpGained);
-      
-      io.to(socketId).emit('game:end', {
-        result: 'lose',
-        targetWord: game.targetWord,
-        xpGained,
-        rankedChange,
-        newRankedPoints: updatedData.rankedPoints,
-        progress: updatedData,
-        leveledUp: false,
-        allGuesses: game.allGuesses
-      });
-    }
-
-    if (player) {
-      player.currentGameId = null;
-    }
-  });
-
-  game.status = 'finished';
-  activeGames.delete(gameId);
-  console.log(`Game ended: ${gameId} - Winner: ${winnerId || 'DRAW'}`);
+function endGame(gameId,winnerId=null,disconnected=false){
+  try{
+    const game=activeGames.get(gameId);
+    if(!game)return;
+    const playerIds=Object.keys(game.players);
+    const isDraw=!winnerId;
+    playerIds.forEach(socketId=>{
+      const playerData=game.players[socketId];
+      const player=players.get(socketId);
+      if(!player)return;
+      const won=socketId===winnerId;
+      const opponentId=playerIds.find(id=>id!==socketId);
+      if(!opponentId)return;
+      let xpGained=0;
+      let rankedChange=0;
+      if(isDraw){
+        xpGained=30;
+        const rankingResult=updateRankedPoints(player.playerId,game.players[opponentId].playerId,true);
+        rankedChange=socketId===playerIds[0]?rankingResult.winnerChange:rankingResult.loserChange;
+        const{playerData:updatedData,leveledUp}=updatePlayerLevel(player.playerId,xpGained);
+        io.to(socketId).emit('game:end',{result:'draw',targetWord:game.targetWord,xpGained,rankedChange,newRankedPoints:updatedData.rankedPoints,progress:updatedData,leveledUp});
+      }else if(won){
+        const fastWinBonus=Math.max(0,(game.maxGuesses-playerData.guesses.length))*15;
+        xpGained=100+fastWinBonus;
+        if(disconnected){xpGained+=50;}
+        const rankingResult=updateRankedPoints(player.playerId,game.players[opponentId].playerId,false);
+        rankedChange=rankingResult.winnerChange;
+        const{playerData:updatedData,leveledUp}=updatePlayerLevel(player.playerId,xpGained);
+        io.to(socketId).emit('game:end',{result:'win',targetWord:game.targetWord,xpGained,rankedChange,newRankedPoints:updatedData.rankedPoints,progress:updatedData,leveledUp,disconnected,guessCount:playerData.guesses.length});
+      }else{
+        xpGained=20;
+        const rankingResult=updateRankedPoints(game.players[opponentId].playerId,player.playerId,false);
+        rankedChange=rankingResult.loserChange;
+        const{playerData:updatedData}=updatePlayerLevel(player.playerId,xpGained);
+        io.to(socketId).emit('game:end',{result:'lose',targetWord:game.targetWord,xpGained,rankedChange,newRankedPoints:updatedData.rankedPoints,progress:updatedData,leveledUp:false});
+      }
+      if(player){player.currentGameId=null;}
+    });
+    game.status='finished';
+    game.endedAt=Date.now();
+    setTimeout(()=>{activeGames.delete(gameId);},5000);
+    console.log(`✅ End: ${gameId}`);
+  }catch(error){
+    console.error('❌ endGame:',error);
+  }
 }
 
-// ===== REST API =====
-app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'ok',
-    players: players.size,
-    queue: queue.size,
-    activeGames: activeGames.size,
-    totalRegistered: Object.keys(persistentPlayers).length
-  });
+setInterval(()=>{
+  const now=Date.now();
+  const timeout=5*60*1000;
+  for(const[gameId,game]of activeGames.entries()){
+    if(game.status==='active'&&(now-game.lastActivity)>timeout){
+      console.log(`⏰ Timeout: ${gameId}`);
+      endGame(gameId,null);
+    }
+  }
+},60000);
+
+app.get('/health',(req,res)=>{
+  res.json({status:'ok',timestamp:Date.now(),players:players.size,queue:queue.size,activeGames:activeGames.size,totalRegistered:Object.keys(persistentPlayers).length});
 });
 
-app.get('/stats', (req, res) => {
-  res.json({
-    totalPlayers: players.size,
-    queueSize: queue.size,
-    activeGames: activeGames.size,
-    registeredPlayers: Object.keys(persistentPlayers).length,
-    leaderboardSize: leaderboard.length
-  });
+app.get('/stats',(req,res)=>{
+  res.json({totalPlayers:players.size,queueSize:queue.size,activeGames:activeGames.size,registeredPlayers:Object.keys(persistentPlayers).length,leaderboardSize:leaderboard.length});
 });
 
-app.get('/leaderboard', (req, res) => {
-  res.json({
-    leaderboard: getLeaderboard()
-  });
+app.get('/leaderboard',(req,res)=>{
+  res.json({leaderboard:getLeaderboard()});
 });
 
-app.get('/player/:playerId', (req, res) => {
-  const { playerId } = req.params;
-  const playerData = getPlayerData(playerId);
-  
-  const rank = leaderboard.findIndex(p => p.playerId === playerId) + 1;
-  
-  res.json({
-    player: playerData,
-    leaderboardRank: rank || null
-  });
+app.get('/player/:playerId',(req,res)=>{
+  const{playerId}=req.params;
+  const playerData=getPlayerData(playerId);
+  const rank=leaderboard.findIndex(p=>p.playerId===playerId)+1;
+  res.json({player:playerData,leaderboardRank:rank||null});
 });
 
-// ===== SERVER START =====
-const PORT = process.env.PORT || 3000;
+const PORT=process.env.PORT||3000;
 
-server.listen(PORT, () => {
-  console.log(`🎮 Roodle Multiplayer Server running on port ${PORT}`);
-  console.log(`📊 Health check: http://localhost:${PORT}/health`);
-  console.log(`🏆 Leaderboard: http://localhost:${PORT}/leaderboard`);
+server.listen(PORT,()=>{
+  console.log(`
+╔═══════════════════════════════════════╗
+║   🎮 ROODLE SERVER - PRODUCTION 🎮   ║
+╠═══════════════════════════════════════╣
+║  Port: ${PORT.toString().padEnd(30)}║
+║  Status: ✅ READY                    ║
+╚═══════════════════════════════════════╝
+  `);
+  console.log(`📊 /health | 🏆 /leaderboard | 📈 /stats`);
 });
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('SIGTERM signal received: saving data and closing HTTP server');
+process.on('SIGTERM',()=>{
+  console.log('⚠️  SIGTERM');
   saveData();
-  server.close(() => {
-    console.log('HTTP server closed');
+  server.close(()=>{
+    console.log('✅ Closed');
+    process.exit(0);
   });
 });
 
-process.on('SIGINT', () => {
-  console.log('SIGINT signal received: saving data and closing HTTP server');
+process.on('SIGINT',()=>{
+  console.log('⚠️  SIGINT');
   saveData();
-  server.close(() => {
-    console.log('HTTP server closed');
+  server.close(()=>{
+    console.log('✅ Closed');
     process.exit(0);
   });
 });
