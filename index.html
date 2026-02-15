@@ -959,8 +959,18 @@ header {
   <span id="status-text">Bağlanıyor...</span>
 </div>
 
-<div class="online-count" id="online-count" style="position: fixed; top: 60px; right: 20px; padding: 6px 14px; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; font-size: 12px; font-family: var(--font-mono); z-index: 1000;">
+<div class="online-count" id="online-count" style="position: fixed; top: 60px; right: 20px; padding: 6px 14px; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; font-size: 12px; font-family: var(--font-mono); z-index: 1000; cursor: pointer;" title="Online oyuncuları gör">
   <span style="color: var(--accent);">👥</span> <span id="online-count-num">0</span> online
+</div>
+
+<div class="online-players-panel" id="online-players-panel" style="position: fixed; top: 100px; right: 20px; width: 280px; max-height: 400px; background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 16px; z-index: 1000; display: none; box-shadow: var(--shadow-lg);">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+    <div style="font-weight: 700; color: var(--accent); display: flex; align-items: center; gap: 8px;">
+      <span>👥</span> Online Oyuncular
+    </div>
+    <button id="close-players-panel" style="background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 18px; padding: 4px; display: flex; align-items: center; justify-content: center; transition: all 0.3s;">✕</button>
+  </div>
+  <div id="online-players-list" style="max-height: 350px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px;"></div>
 </div>
 
 <header>
@@ -1042,23 +1052,63 @@ header {
 </div>
 
 <div class="modal-overlay" id="shop-modal">
-  <div class="modal">
+  <div class="modal" style="max-width: 650px;">
     <button class="modal-close" id="shop-close">✕</button>
     <h2>🛍️ Kozmetik Mağazası</h2>
-    <div style="margin: 20px 0; padding: 16px; background: var(--surface3); border-radius: 12px; text-align: center;">
-      <div style="font-size: 28px; font-weight: 900; color: var(--accent4); font-family: var(--font-display);" id="shop-coins">0</div>
-      <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Coin Bakiyesi</div>
+    <div style="margin: 20px 0; padding: 20px; background: linear-gradient(135deg, var(--surface3), var(--surface2)); border: 2px solid var(--accent); border-radius: 16px; text-align: center; position: relative; overflow: hidden;">
+      <div style="position: absolute; inset: 0; background: linear-gradient(45deg, transparent 30%, rgba(0,255,179,0.1) 50%, transparent 70%); animation: shine 3s infinite;"></div>
+      <div style="position: relative; z-index: 1;">
+        <div style="font-size: 40px; font-weight: 900; color: var(--accent4); font-family: var(--font-display); text-shadow: 0 0 20px var(--accent4), 0 0 40px var(--accent4);" id="shop-coins">0</div>
+        <div style="font-size: 13px; color: var(--text); font-weight: 700; margin-top: 4px; letter-spacing: 0.1em;">💰 COIN BAKİYESİ</div>
+      </div>
     </div>
     
-    <div style="display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 2px solid var(--border); padding-bottom: 8px;">
-      <button class="shop-tab active" data-tab="frames">🖼️ Çerçeveler</button>
-      <button class="shop-tab" data-tab="badges">🏅 Rozetler</button>
-      <button class="shop-tab" data-tab="colors">🎨 Renkler</button>
+    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 20px;">
+      <button class="shop-tab active" data-tab="frames" style="padding: 12px 8px;">
+        <div style="font-size: 20px; margin-bottom: 4px;">🖼️</div>
+        <div style="font-size: 11px;">Çerçeveler</div>
+      </button>
+      <button class="shop-tab" data-tab="badges" style="padding: 12px 8px;">
+        <div style="font-size: 20px; margin-bottom: 4px;">🏅</div>
+        <div style="font-size: 11px;">Rozetler</div>
+      </button>
+      <button class="shop-tab" data-tab="colors" style="padding: 12px 8px;">
+        <div style="font-size: 20px; margin-bottom: 4px;">🎨</div>
+        <div style="font-size: 11px;">Renkler</div>
+      </button>
+      <button class="shop-tab" data-tab="backgrounds" style="padding: 12px 8px;">
+        <div style="font-size: 20px; margin-bottom: 4px;">🌌</div>
+        <div style="font-size: 11px;">Arka Planlar</div>
+      </button>
     </div>
     
-    <div id="shop-content" style="max-height: 400px; overflow-y: auto;"></div>
+    <div id="shop-content" style="max-height: 450px; overflow-y: auto; padding-right: 8px;"></div>
   </div>
 </div>
+
+<style>
+@keyframes shine {
+  0%, 100% { transform: translateX(-100%); }
+  50% { transform: translateX(100%); }
+}
+
+@keyframes rarity-glow {
+  0%, 100% { box-shadow: 0 0 10px var(--rarity-color), 0 0 20px var(--rarity-color); }
+  50% { box-shadow: 0 0 20px var(--rarity-color), 0 0 40px var(--rarity-color); }
+}
+
+.shop-item {
+  transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+}
+
+.shop-item:hover {
+  transform: translateY(-4px) scale(1.02);
+}
+
+.shop-item.legendary, .shop-item.mythic {
+  animation: rarity-glow 2s ease-in-out infinite;
+}
+</style>
 
 <div class="modal-overlay" id="profile-modal">
   <div class="modal">
@@ -1173,33 +1223,80 @@ const RANKS = {
 
 const COSMETICS = {
   avatarFrames: [
-    { id: 'default', name: 'Varsayılan', cost: 0, emoji: '⬜' },
-    { id: 'bronze', name: 'Bronz Çerçeve', cost: 500, emoji: '🥉' },
-    { id: 'silver', name: 'Gümüş Çerçeve', cost: 1000, emoji: '🥈' },
-    { id: 'gold', name: 'Altın Çerçeve', cost: 2000, emoji: '🥇' },
-    { id: 'diamond', name: 'Elmas Çerçeve', cost: 5000, emoji: '💎' },
-    { id: 'fire', name: 'Ateş Çerçevesi', cost: 3000, emoji: '🔥' },
-    { id: 'ice', name: 'Buz Çerçevesi', cost: 3000, emoji: '❄️' },
-    { id: 'star', name: 'Yıldız Çerçevesi', cost: 4000, emoji: '⭐' }
+    { id: 'default', name: 'Klasik', cost: 0, emoji: '⬜', rarity: 'common', desc: 'Başlangıç çerçevesi' },
+    { id: 'bronze', name: 'Bronz Şövalye', cost: 800, emoji: '🥉', rarity: 'common', desc: 'İlk zaferinin kanıtı', glow: '#CD7F32' },
+    { id: 'silver', name: 'Gümüş Lejyon', cost: 1500, emoji: '🥈', rarity: 'uncommon', desc: 'Parlayan cesaret', glow: '#C0C0C0' },
+    { id: 'gold', name: 'Altın İmparator', cost: 3000, emoji: '🥇', rarity: 'rare', desc: 'Zafer tacının sahibi', glow: '#FFD700', animated: true },
+    { id: 'diamond', name: 'Elmas Titan', cost: 6000, emoji: '💎', rarity: 'epic', desc: 'Kırılmaz irade', glow: '#00e1ff', animated: true },
+    { id: 'fire', name: 'Ateş Efendisi', cost: 4500, emoji: '🔥', rarity: 'rare', desc: 'Yakıcı tutku', glow: '#ff4500', animated: true, particle: 'fire' },
+    { id: 'ice', name: 'Buz Kralı', cost: 4500, emoji: '❄️', rarity: 'rare', desc: 'Donduran soğukkanlılık', glow: '#00ffff', animated: true, particle: 'ice' },
+    { id: 'lightning', name: 'Şimşek Tanrısı', cost: 5500, emoji: '⚡', rarity: 'epic', desc: 'Yıldırım hızı', glow: '#ffd700', animated: true, particle: 'lightning' },
+    { id: 'cosmic', name: 'Kozmik Varlık', cost: 8000, emoji: '🌌', rarity: 'legendary', desc: 'Evrenin sırlarını çözen', glow: '#9400d3', animated: true, particle: 'cosmic' },
+    { id: 'phoenix', name: 'Anka Kuşu', cost: 10000, emoji: '🔥', rarity: 'legendary', desc: 'Küllerinden doğan efsane', glow: '#ff6b00', animated: true, particle: 'phoenix' },
+    { id: 'shadow', name: 'Gölge Lordu', cost: 7500, emoji: '🌑', rarity: 'epic', desc: 'Karanlığın efendisi', glow: '#2d2d2d', animated: true, particle: 'shadow' },
+    { id: 'rainbow', name: 'Gökkuşağı Sihirbazı', cost: 9000, emoji: '🌈', rarity: 'legendary', desc: 'Renklerin ustası', gradient: true, animated: true, particle: 'rainbow' },
+    { id: 'galaxy', name: 'Galaksi Koruyucusu', cost: 12000, emoji: '✨', rarity: 'mythic', desc: 'Yıldızların hakimi', glow: '#4b0082', animated: true, particle: 'galaxy' }
   ],
   profileBadges: [
-    { id: 'winner', name: 'Kazanan', cost: 0, emoji: '🏆' },
-    { id: 'streak3', name: '3 Seri', cost: 300, emoji: '🔥' },
-    { id: 'streak5', name: '5 Seri', cost: 800, emoji: '🔥🔥' },
-    { id: 'streak10', name: '10 Seri', cost: 2000, emoji: '🔥🔥🔥' },
-    { id: 'master', name: 'Kelime Ustası', cost: 5000, emoji: '👑' },
-    { id: 'legend', name: 'Efsane', cost: 10000, emoji: '⚡' }
+    { id: 'winner', name: 'Kazanan', cost: 0, emoji: '🏆', rarity: 'common', desc: 'İlk zaferin' },
+    { id: 'streak3', name: 'Ateş Başlangıcı', cost: 500, emoji: '🔥', rarity: 'common', desc: '3 art arda kazanma' },
+    { id: 'streak5', name: 'Alev Yüreği', cost: 1200, emoji: '🔥🔥', rarity: 'uncommon', desc: '5 art arda kazanma' },
+    { id: 'streak10', name: 'İnferno Efendisi', cost: 3000, emoji: '🔥🔥🔥', rarity: 'rare', desc: '10 art arda kazanma' },
+    { id: 'speedster', name: 'Hız Şeytanı', cost: 2500, emoji: '⚡', rarity: 'rare', desc: 'Rekabetçide 10 saniyede kazanma' },
+    { id: 'perfectionist', name: 'Mükemmeliyetçi', cost: 4000, emoji: '💯', rarity: 'epic', desc: '1. tahminde 10 kez kazanma' },
+    { id: 'master', name: 'Kelime Ustası', cost: 6000, emoji: '👑', rarity: 'epic', desc: '100 kelime bul' },
+    { id: 'veteran', name: 'Veteran Savaşçı', cost: 5000, emoji: '🎖️', rarity: 'epic', desc: '500 oyun oyna' },
+    { id: 'legend', name: 'Yaşayan Efsane', cost: 12000, emoji: '⚡', rarity: 'legendary', desc: 'Level 10\'a ulaş' },
+    { id: 'unbeatable', name: 'Yenilmez', cost: 15000, emoji: '🛡️', rarity: 'mythic', desc: '50 art arda kazanma' },
+    { id: 'genius', name: 'Dahi', cost: 8000, emoji: '🧠', rarity: 'legendary', desc: '50 kelimeyi 1. tahminde bul' },
+    { id: 'collector', name: 'Koleksiyoncu', cost: 10000, emoji: '💎', rarity: 'legendary', desc: 'Tüm kozmetikleri topla' }
   ],
   profileColors: [
-    { id: 'default', name: 'Varsayılan', cost: 0, color: '#00ffb3' },
-    { id: 'purple', name: 'Mor', cost: 500, color: '#9b59b6' },
-    { id: 'red', name: 'Kırmızı', cost: 500, color: '#e74c3c' },
-    { id: 'blue', name: 'Mavi', cost: 500, color: '#3498db' },
-    { id: 'orange', name: 'Turuncu', cost: 500, color: '#e67e22' },
-    { id: 'pink', name: 'Pembe', cost: 800, color: '#ff0095' },
-    { id: 'cyan', name: 'Camgöbeği', cost: 800, color: '#00e1ff' },
-    { id: 'rainbow', name: 'Gökkuşağı', cost: 3000, gradient: true }
+    { id: 'default', name: 'Neon Yeşil', cost: 0, color: '#00ffb3', rarity: 'common', desc: 'Klasik Roodle rengi' },
+    { id: 'crimson', name: 'Kızıl Öfke', cost: 800, color: '#dc143c', rarity: 'common', desc: 'Tutkulu kırmızı' },
+    { id: 'royal', name: 'Kraliyet Mavisi', cost: 800, color: '#4169e1', rarity: 'common', desc: 'Asil mavi' },
+    { id: 'toxic', name: 'Zehir Yeşili', cost: 1200, color: '#39ff14', rarity: 'uncommon', desc: 'Parlayan neon' },
+    { id: 'purple', name: 'Mor İmparatorluk', cost: 1200, color: '#9b59b6', rarity: 'uncommon', desc: 'Gizemli mor' },
+    { id: 'sunset', name: 'Günbatımı Turuncusu', cost: 1500, color: '#ff6347', rarity: 'uncommon', desc: 'Sıcak ton' },
+    { id: 'cyberpink', name: 'Cyber Pembe', cost: 2000, color: '#ff0095', rarity: 'rare', desc: 'Gelecekten gelen renk' },
+    { id: 'electric', name: 'Elektrik Mavisi', cost: 2000, color: '#00e1ff', rarity: 'rare', desc: 'Enerjik parlaklık' },
+    { id: 'gold', name: 'Altın Işıltısı', cost: 3000, color: '#ffd700', rarity: 'rare', desc: 'Değerli metal', animated: true },
+    { id: 'rainbow', name: 'Gökkuşağı Büyüsü', cost: 5000, rarity: 'epic', desc: 'Tüm renkler senin', gradient: 'linear-gradient(135deg, #00ffb3, #00e1ff, #ff0095, #ffd600)', animated: true },
+    { id: 'lava', name: 'Lav Akışı', cost: 4500, rarity: 'epic', desc: 'Ateşten doğan güç', gradient: 'linear-gradient(135deg, #ff4500, #ff6b00, #ff8c00)', animated: true },
+    { id: 'ocean', name: 'Okyanus Derinliği', cost: 4500, rarity: 'epic', desc: 'Denizlerin gücü', gradient: 'linear-gradient(135deg, #006994, #0099cc, #00bfff)', animated: true },
+    { id: 'galaxy', name: 'Galaksi Esintisi', cost: 6000, rarity: 'legendary', desc: 'Uzayın sonsuzluğu', gradient: 'linear-gradient(135deg, #2d0050, #5c00a3, #8e44ad, #c600ff)', animated: true },
+    { id: 'matrix', name: 'Matrix Kodu', cost: 7000, rarity: 'legendary', desc: 'Dijital evren', gradient: 'linear-gradient(135deg, #003300, #00ff00, #006600)', animated: true },
+    { id: 'prismatic', name: 'Prizmatik Işık', cost: 10000, rarity: 'mythic', desc: 'Işığın kırılımı', gradient: 'linear-gradient(135deg, #ff0000, #ff7f00, #ffff00, #00ff00, #0000ff, #4b0082, #9400d3)', animated: true, special: 'rainbow-shift' }
+  ],
+  profileBackgrounds: [
+    { id: 'none', name: 'Sade', cost: 0, rarity: 'common', desc: 'Arka plan yok' },
+    { id: 'stars', name: 'Yıldız Tozu', cost: 2000, emoji: '✨', rarity: 'uncommon', desc: 'Parlayan yıldızlar', effect: 'stars' },
+    { id: 'matrix', name: 'Matrix Dünyası', cost: 3500, emoji: '💻', rarity: 'rare', desc: 'Dijital yağmur', effect: 'matrix' },
+    { id: 'fire', name: 'Alev Çemberi', cost: 4000, emoji: '🔥', rarity: 'rare', desc: 'Ateşten kuşatma', effect: 'fire-ring' },
+    { id: 'lightning', name: 'Şimşek Fırtınası', cost: 5000, emoji: '⚡', rarity: 'epic', desc: 'Elektrik yüklü atmosfer', effect: 'lightning' },
+    { id: 'cosmic', name: 'Kozmik Nebula', cost: 6000, emoji: '🌌', rarity: 'epic', desc: 'Evren bulutları', effect: 'nebula' },
+    { id: 'aurora', name: 'Kuzey Işıkları', cost: 7500, emoji: '🌈', rarity: 'legendary', desc: 'Dans eden renkler', effect: 'aurora' },
+    { id: 'portal', name: 'Boyut Kapısı', cost: 10000, emoji: '🌀', rarity: 'mythic', desc: 'Başka evrene geçit', effect: 'portal' }
+  ],
+  titleEffects: [
+    { id: 'none', name: 'Normal', cost: 0, rarity: 'common', desc: 'Efekt yok' },
+    { id: 'glow', name: 'Parlama', cost: 1500, emoji: '✨', rarity: 'uncommon', desc: 'İsmin ışıldıyor' },
+    { id: 'wave', name: 'Dalga', cost: 2500, emoji: '〰️', rarity: 'rare', desc: 'Harfler dalgalanıyor' },
+    { id: 'shake', name: 'Titreşim', cost: 2500, emoji: '📳', rarity: 'rare', desc: 'Enerji titreşimi' },
+    { id: 'rainbow', name: 'Gökkuşağı', cost: 4000, emoji: '🌈', rarity: 'epic', desc: 'Renk değiştiren isim' },
+    { id: 'glitch', name: 'Glitch', cost: 5000, emoji: '⚡', rarity: 'epic', desc: 'Dijital bozulma' },
+    { id: 'fire', name: 'Ateş', cost: 6000, emoji: '🔥', rarity: 'legendary', desc: 'Yanan harfler' },
+    { id: 'hologram', name: 'Hologram', cost: 8000, emoji: '👻', rarity: 'legendary', desc: '3D holografik görünüm' }
   ]
+};
+
+const RARITY_COLORS = {
+  common: { color: '#9e9e9e', glow: 'rgba(158, 158, 158, 0.3)', name: 'Yaygın' },
+  uncommon: { color: '#4caf50', glow: 'rgba(76, 175, 80, 0.4)', name: 'Nadir' },
+  rare: { color: '#2196f3', glow: 'rgba(33, 150, 243, 0.5)', name: 'Ender' },
+  epic: { color: '#9c27b0', glow: 'rgba(156, 39, 176, 0.6)', name: 'Epik' },
+  legendary: { color: '#ff9800', glow: 'rgba(255, 152, 0, 0.7)', name: 'Efsanevi' },
+  mythic: { color: '#f44336', glow: 'rgba(244, 67, 54, 0.8)', name: 'Mitik' }
 };
 
 const KB_ROWS = [
@@ -1224,6 +1321,9 @@ let currentGameId = null;
 let opponentData = null;
 let isMyTurn = false;
 let maxGuesses = 6;
+let turnTimer = null;
+let timeRemaining = 30;
+let onlinePlayers = [];
 
 let playerProfile = {
   playerId: null,
@@ -1243,9 +1343,13 @@ let playerProfile = {
     ownedFrames: ['default'],
     ownedBadges: ['winner'],
     ownedColors: ['default'],
+    ownedBackgrounds: ['none'],
+    ownedTitles: ['none'],
     equippedFrame: 'default',
     equippedBadge: 'winner',
-    equippedColor: 'default'
+    equippedColor: 'default',
+    equippedBackground: 'none',
+    equippedTitle: 'none'
   }
 };
 
@@ -1276,32 +1380,147 @@ function renderShop(tab) {
     items = COSMETICS.profileColors;
     owned = playerProfile.cosmetics?.ownedColors || ['default'];
     equipped = playerProfile.cosmetics?.equippedColor || 'default';
+  } else if (tab === 'backgrounds') {
+    items = COSMETICS.profileBackgrounds || [];
+    owned = playerProfile.cosmetics?.ownedBackgrounds || ['none'];
+    equipped = playerProfile.cosmetics?.equippedBackground || 'none';
   }
   
-  content.innerHTML = items.map(item => {
-    const isOwned = owned.includes(item.id);
-    const isEquipped = equipped === item.id;
+  // Group by rarity
+  const grouped = {
+    mythic: items.filter(i => i.rarity === 'mythic'),
+    legendary: items.filter(i => i.rarity === 'legendary'),
+    epic: items.filter(i => i.rarity === 'epic'),
+    rare: items.filter(i => i.rarity === 'rare'),
+    uncommon: items.filter(i => i.rarity === 'uncommon'),
+    common: items.filter(i => i.rarity === 'common')
+  };
+  
+  let html = '';
+  
+  Object.entries(grouped).forEach(([rarity, rarityItems]) => {
+    if (rarityItems.length === 0) return;
     
-    return `
-      <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px; margin-bottom: 8px; background: ${isEquipped ? 'var(--surface3)' : 'var(--surface2)'}; border: 1px solid ${isEquipped ? 'var(--accent)' : 'var(--border)'}; border-radius: 12px;">
-        <div style="display: flex; align-items: center; gap: 12px;">
-          <div style="font-size: 28px;">${item.emoji || '⬜'}</div>
-          <div>
-            <div style="font-weight: 700; color: var(--text);">${item.name}</div>
-            <div style="font-size: 12px; color: var(--text-muted);">${isOwned ? (isEquipped ? '✅ Donatılmış' : '✓ Sahipsin') : item.cost + ' coin'}</div>
+    const rarityInfo = RARITY_COLORS[rarity];
+    
+    html += `
+      <div style="margin-bottom: 24px;">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid ${rarityInfo.color};">
+          <div style="width: 8px; height: 8px; background: ${rarityInfo.color}; border-radius: 50%; box-shadow: 0 0 10px ${rarityInfo.color};"></div>
+          <div style="font-weight: 800; font-size: 14px; color: ${rarityInfo.color}; text-transform: uppercase; letter-spacing: 0.1em;">${rarityInfo.name}</div>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px;">
+    `;
+    
+    rarityItems.forEach(item => {
+      const isOwned = owned.includes(item.id);
+      const isEquipped = equipped === item.id;
+      const canAfford = (playerProfile.coins || 0) >= item.cost;
+      
+      html += `
+        <div class="shop-item ${rarity}" style="
+          --rarity-color: ${rarityInfo.glow};
+          position: relative;
+          background: linear-gradient(135deg, ${isEquipped ? 'var(--surface3)' : 'var(--surface2)'}, var(--surface));
+          border: 2px solid ${isEquipped ? rarityInfo.color : 'var(--border)'};
+          border-radius: 16px;
+          padding: 16px;
+          cursor: pointer;
+          overflow: hidden;
+          ${isEquipped ? `box-shadow: 0 0 20px ${rarityInfo.glow}, inset 0 0 20px ${rarityInfo.glow};` : ''}
+        ">
+          ${rarity === 'legendary' || rarity === 'mythic' ? `
+            <div style="position: absolute; top: 0; right: 0; width: 100px; height: 100px; background: radial-gradient(circle, ${rarityInfo.glow} 0%, transparent 70%); opacity: 0.3; pointer-events: none;"></div>
+          ` : ''}
+          
+          <div style="display: flex; align-items: start; gap: 12px; margin-bottom: 12px;">
+            <div style="
+              font-size: 36px;
+              width: 56px;
+              height: 56px;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              background: ${isOwned ? rarityInfo.glow : 'var(--surface3)'};
+              border-radius: 12px;
+              flex-shrink: 0;
+              ${item.animated ? 'animation: pulse 2s ease-in-out infinite;' : ''}
+            ">
+              ${item.emoji || '⬜'}
+            </div>
+            <div style="flex: 1; min-width: 0;">
+              <div style="font-weight: 800; font-size: 15px; color: ${isOwned ? rarityInfo.color : 'var(--text)'}; margin-bottom: 4px;">
+                ${item.name}
+                ${isEquipped ? '<span style="font-size: 11px; background: ' + rarityInfo.color + '; color: var(--bg); padding: 2px 6px; border-radius: 4px; margin-left: 6px;">KULLANIMDA</span>' : ''}
+              </div>
+              <div style="font-size: 11px; color: var(--text-muted); line-height: 1.4; margin-bottom: 8px;">
+                ${item.desc}
+              </div>
+              ${item.gradient ? `
+                <div style="height: 24px; background: ${item.gradient}; border-radius: 8px; margin-bottom: 8px;"></div>
+              ` : ''}
+            </div>
+          </div>
+          
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+            ${isOwned ? `
+              ${isEquipped ? `
+                <div style="flex: 1; text-align: center; padding: 10px; background: linear-gradient(135deg, ${rarityInfo.color}, ${rarityInfo.glow}); border-radius: 10px; font-weight: 800; font-size: 13px; color: var(--bg);">
+                  ✓ Donatılmış
+                </div>
+              ` : `
+                <button onclick="equipCosmetic('${tab}', '${item.id}')" style="
+                  flex: 1;
+                  padding: 10px 16px;
+                  background: linear-gradient(135deg, var(--accent), var(--accent2));
+                  border: none;
+                  border-radius: 10px;
+                  color: var(--bg);
+                  font-weight: 800;
+                  font-size: 13px;
+                  cursor: pointer;
+                  transition: all 0.3s;
+                  box-shadow: 0 4px 12px rgba(0,255,179,0.3);
+                ">
+                  ⚡ DONAT
+                </button>
+              `}
+            ` : `
+              <div style="flex: 1; display: flex; align-items: center; gap: 8px;">
+                <div style="font-size: 20px; font-weight: 900; color: ${canAfford ? 'var(--accent4)' : 'var(--accent3)'}; font-family: var(--font-display);">
+                  ${item.cost}
+                </div>
+                <div style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">COIN</div>
+              </div>
+              <button onclick="buyCosmetic('${tab}', '${item.id}')" ${!canAfford ? 'disabled' : ''} style="
+                padding: 10px 20px;
+                background: ${canAfford ? 'linear-gradient(135deg, var(--accent2), var(--accent3))' : 'var(--surface3)'};
+                border: none;
+                border-radius: 10px;
+                color: ${canAfford ? 'var(--bg)' : 'var(--text-muted)'};
+                font-weight: 800;
+                font-size: 13px;
+                cursor: ${canAfford ? 'pointer' : 'not-allowed'};
+                opacity: ${canAfford ? '1' : '0.5'};
+                transition: all 0.3s;
+                white-space: nowrap;
+              ">
+                ${canAfford ? '🛒 SATIN AL' : '🔒 KİLİTLİ'}
+              </button>
+            `}
           </div>
         </div>
-        <div>
-          ${isOwned 
-            ? (isEquipped 
-              ? '<span style="color: var(--accent); font-weight: 700;">Kullanımda</span>' 
-              : `<button onclick="equipCosmetic('${tab}', '${item.id}')" style="padding: 8px 16px; background: var(--accent); border: none; border-radius: 8px; color: var(--bg); font-weight: 700; cursor: pointer;">Donat</button>`)
-            : `<button onclick="buyCosmetic('${tab}', '${item.id}')" style="padding: 8px 16px; background: linear-gradient(135deg, var(--accent2), var(--accent3)); border: none; border-radius: 8px; color: var(--bg); font-weight: 700; cursor: pointer;">Satın Al</button>`
-          }
-        </div>
-      </div>
-    `;
-  }).join('');
+      `;
+    });
+    
+    html += '</div></div>';
+  });
+  
+  if (html === '') {
+    html = '<div style="text-align: center; padding: 60px 20px; color: var(--text-muted);">Bu kategoride henüz öğe yok</div>';
+  }
+  
+  content.innerHTML = html;
 }
 
 function buyCosmetic(type, itemId) {
@@ -1310,7 +1529,15 @@ function buyCosmetic(type, itemId) {
     return;
   }
   
-  socket.emit('cosmetic:buy', { itemType: type === 'frames' ? 'frame' : type === 'badges' ? 'badge' : 'color', itemId });
+  const typeMap = {
+    'frames': 'frame',
+    'badges': 'badge',
+    'colors': 'color',
+    'backgrounds': 'background',
+    'titles': 'title'
+  };
+  
+  socket.emit('cosmetic:buy', { itemType: typeMap[type], itemId });
 }
 
 function equipCosmetic(type, itemId) {
@@ -1319,7 +1546,15 @@ function equipCosmetic(type, itemId) {
     return;
   }
   
-  socket.emit('cosmetic:equip', { itemType: type === 'frames' ? 'frame' : type === 'badges' ? 'badge' : 'color', itemId });
+  const typeMap = {
+    'frames': 'frame',
+    'badges': 'badge',
+    'colors': 'color',
+    'backgrounds': 'background',
+    'titles': 'title'
+  };
+  
+  socket.emit('cosmetic:equip', { itemType: typeMap[type], itemId });
 }
 
 // ===== INITIALIZATION =====
@@ -1424,6 +1659,9 @@ function buildKeyboard() {
 document.addEventListener('keydown', e => {
   if (gameOver || !inputEnabled) return;
   if (document.querySelector('.modal-overlay.show')) return;
+  
+  // Don't capture keys if typing in chat or other inputs
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
 
   const key = e.key.toUpperCase();
   if (key === 'ENTER') handleKey('ENTER');
@@ -1510,6 +1748,7 @@ function submitGuess() {
     }
     
     console.log('📤 Sending guess:', guess);
+    stopTurnTimer();
     socket.emit('game:guess', { gameId: currentGameId, guess: guess });
     return;
   }
@@ -1850,6 +2089,9 @@ function connectToServer() {
       
       const { rowIndex, guess, result } = data;
       
+      // Stop timer when board updates
+      stopTurnTimer();
+      
       revealRow(rowIndex, guess, result, () => {
         currentRow = data.nextRow;
         currentCol = 0;
@@ -1878,6 +2120,8 @@ function connectToServer() {
       targetWord = data.targetWord;
       isMyTurn = false;
       
+      stopTurnTimer();
+      
       if (data.progress) {
         playerProfile = { ...playerProfile, ...data.progress };
         updateProfileDisplay();
@@ -1896,6 +2140,10 @@ function connectToServer() {
     
     socket.on('online:count', (data) => {
       document.getElementById('online-count-num').textContent = data.count || 0;
+      if (data.players) {
+        onlinePlayers = data.players;
+        renderOnlinePlayers();
+      }
     });
 
     socket.on('chat:message', (data) => {
@@ -1910,10 +2158,12 @@ function connectToServer() {
     });
 
     socket.on('turn:timeout', (data) => {
+      stopTurnTimer();
       showToast(data.message, true);
     });
 
     socket.on('game:turn:update', (data) => {
+      stopTurnTimer();
       isMyTurn = data.yourTurn;
       currentRow = data.nextRow;
       if (data.yourTurn) {
@@ -2045,6 +2295,7 @@ function updateTurnDisplay(isYourTurn, opponentNick) {
   
   if (gameMode !== 'multiplayer' || !currentGameId) {
     turnDisplay.innerHTML = '';
+    stopTurnTimer();
     return;
   }
   
@@ -2052,17 +2303,91 @@ function updateTurnDisplay(isYourTurn, opponentNick) {
   
   if (isYourTurn) {
     turnDisplay.innerHTML = `
-      <div style="background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%); color: var(--bg); padding: 12px 24px; border-radius: 12px; font-weight: 800; text-align: center; animation: pulse 1.5s ease-in-out infinite; box-shadow: var(--glow);">
-        ⚡ Senin Sıran! (${remainingGuesses} tahmin kaldı)
+      <div style="background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%); color: var(--bg); padding: 12px 24px; border-radius: 12px; font-weight: 800; text-align: center; animation: pulse 1.5s ease-in-out infinite; box-shadow: var(--glow); display: flex; align-items: center; justify-content: center; gap: 12px;">
+        <span>⚡ Senin Sıran!</span>
+        <span style="font-family: var(--font-mono); font-size: 20px; min-width: 50px;" id="turn-timer">30</span>
+        <span style="font-size: 12px; opacity: 0.8;">(${remainingGuesses} tahmin kaldı)</span>
       </div>
     `;
+    startTurnTimer();
   } else {
     turnDisplay.innerHTML = `
       <div style="background: var(--surface2); border: 1px solid var(--border); color: var(--text-muted); padding: 12px 24px; border-radius: 12px; font-weight: 700; text-align: center;">
         ⏳ ${opponentNick}'in sırası... (${remainingGuesses} tahmin kaldı)
       </div>
     `;
+    stopTurnTimer();
   }
+}
+
+function startTurnTimer() {
+  stopTurnTimer();
+  timeRemaining = 30;
+  updateTimerDisplay();
+  
+  turnTimer = setInterval(() => {
+    timeRemaining--;
+    updateTimerDisplay();
+    
+    if (timeRemaining <= 0) {
+      stopTurnTimer();
+    }
+  }, 1000);
+}
+
+function stopTurnTimer() {
+  if (turnTimer) {
+    clearInterval(turnTimer);
+    turnTimer = null;
+  }
+}
+
+function updateTimerDisplay() {
+  const timerEl = document.getElementById('turn-timer');
+  if (timerEl) {
+    timerEl.textContent = timeRemaining;
+    
+    // Change color when time is running out
+    if (timeRemaining <= 5) {
+      timerEl.style.color = 'var(--accent3)';
+      timerEl.style.animation = 'pulse 0.5s ease-in-out infinite';
+    } else if (timeRemaining <= 10) {
+      timerEl.style.color = 'var(--accent4)';
+    }
+  }
+}
+
+function renderOnlinePlayers() {
+  const listEl = document.getElementById('online-players-list');
+  if (!listEl) return;
+  
+  if (onlinePlayers.length === 0) {
+    listEl.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 20px; font-size: 13px;">Henüz online oyuncu yok</div>';
+    return;
+  }
+  
+  // Sort by level descending
+  const sorted = [...onlinePlayers].sort((a, b) => (b.level || 1) - (a.level || 1));
+  
+  listEl.innerHTML = sorted.map((player, index) => {
+    const isMe = player.playerId === playerProfile.playerId;
+    return `
+      <div style="display: flex; align-items: center; gap: 10px; padding: 10px; background: ${isMe ? 'var(--surface3)' : 'var(--surface)'}; border: 1px solid ${isMe ? 'var(--accent)' : 'var(--border)'}; border-radius: 10px; transition: all 0.3s;">
+        <div style="width: 32px; height: 32px; background: linear-gradient(135deg, var(--accent), var(--accent2)); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800; color: var(--bg); flex-shrink: 0;">
+          ${(player.nick || 'O')[0].toUpperCase()}
+        </div>
+        <div style="flex: 1; min-width: 0;">
+          <div style="font-size: 13px; font-weight: 700; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+            ${player.nick || 'Oyuncu'} ${isMe ? '<span style="color: var(--accent); font-size: 11px;">(Sen)</span>' : ''}
+          </div>
+          <div style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">
+            Level ${player.level || 1} • ${player.rank || 'Yeni Doğmuş I'}
+          </div>
+        </div>
+        ${player.inGame ? '<div style="width: 8px; height: 8px; background: var(--accent4); border-radius: 50%; flex-shrink: 0; animation: pulse 1.5s ease-in-out infinite;" title="Oyunda"></div>' : '<div style="width: 8px; height: 8px; background: var(--correct); border-radius: 50%; flex-shrink: 0;" title="Aktif"></div>'}
+      </div>
+    `;
+  }).join('');
 }
 
 function renderLeaderboard(data) {
@@ -2190,6 +2515,8 @@ document.getElementById('queue-btn').addEventListener('click', () => {
 
 document.getElementById('result-new-btn').addEventListener('click', () => {
   document.getElementById('result-modal').classList.remove('show');
+  
+  stopTurnTimer();
   
   if (gameMode === 'multiplayer') {
     document.getElementById('opponent-panel').style.display = 'none';
@@ -2340,6 +2667,8 @@ document.querySelectorAll('.mode-tab').forEach(btn => {
     btn.classList.add('active');
     gameMode = mode;
     
+    stopTurnTimer();
+    
     if (mode === 'multiplayer') {
       document.getElementById('queue-section').style.display = 'block';
       document.getElementById('opponent-panel').style.display = 'none';
@@ -2367,6 +2696,31 @@ window.addEventListener('resize', () => {
   const canvas = document.getElementById('confetti-canvas');
   canvas.width = window.innerWidth;
   canvas.height = window.innerHeight;
+});
+
+// Online players panel toggle
+document.getElementById('online-count').addEventListener('click', () => {
+  const panel = document.getElementById('online-players-panel');
+  if (panel.style.display === 'none' || panel.style.display === '') {
+    panel.style.display = 'block';
+    panel.style.animation = 'fadeIn 0.3s ease-in-out';
+  } else {
+    panel.style.display = 'none';
+  }
+});
+
+document.getElementById('close-players-panel').addEventListener('click', (e) => {
+  e.stopPropagation();
+  document.getElementById('online-players-panel').style.display = 'none';
+});
+
+// Close panel when clicking outside
+document.addEventListener('click', (e) => {
+  const panel = document.getElementById('online-players-panel');
+  const counter = document.getElementById('online-count');
+  if (panel.style.display === 'block' && !panel.contains(e.target) && !counter.contains(e.target)) {
+    panel.style.display = 'none';
+  }
 });
 
 // START
