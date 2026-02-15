@@ -845,6 +845,36 @@ header {
   to { opacity: 0; }
 }
 
+.shop-tab {
+  flex: 1;
+  padding: 10px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 700;
+  transition: all 0.3s;
+}
+
+.shop-tab:hover {
+  background: var(--surface3);
+  color: var(--text);
+}
+
+.shop-tab.active {
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  color: var(--bg);
+  border-color: transparent;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 #confetti-canvas {
   position: fixed;
   inset: 0;
@@ -929,6 +959,10 @@ header {
   <span id="status-text">Bağlanıyor...</span>
 </div>
 
+<div class="online-count" id="online-count" style="position: fixed; top: 60px; right: 20px; padding: 6px 14px; background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; font-size: 12px; font-family: var(--font-mono); z-index: 1000;">
+  <span style="color: var(--accent);">👥</span> <span id="online-count-num">0</span> online
+</div>
+
 <header>
   <div class="logo">
     <div class="logo-main">ROODLE</div>
@@ -945,6 +979,7 @@ header {
         <div class="user-xp-fill" id="user-xp-fill" style="width: 0%"></div>
       </div>
     </div>
+    <button class="icon-btn" id="shop-btn" title="Mağaza">🛍️</button>
     <button class="icon-btn" id="leaderboard-btn" title="Sıralama Tablosu">🏆</button>
     <button class="icon-btn" id="help-btn" title="Yardım">❓</button>
   </div>
@@ -989,13 +1024,41 @@ header {
       <div class="opponent-progress" id="opponent-progress">Bekliyor...</div>
     </div>
   </div>
+  
+  <div id="chat-panel" style="display: none; width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: 16px; padding: 16px; margin-bottom: 16px;">
+    <div style="font-weight: 700; margin-bottom: 8px; color: var(--accent); display: flex; align-items: center; gap: 8px;">
+      <span>💬</span> Sohbet
+    </div>
+    <div style="height: 150px; overflow-y: auto; margin-bottom: 12px; padding: 12px; background: var(--surface); border-radius: 12px;" id="chat-messages"></div>
+    <div style="display: flex; gap: 8px;">
+      <input type="text" id="chat-input" placeholder="Mesaj yaz..." maxlength="100" style="flex: 1; padding: 10px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-family: var(--font-body); font-size: 14px;">
+      <button id="chat-send" style="padding: 10px 20px; background: linear-gradient(135deg, var(--accent), var(--accent2)); border: none; border-radius: 10px; color: var(--bg); font-weight: 700; cursor: pointer; transition: all 0.3s;">Gönder</button>
+    </div>
+  </div>
+  
   <div id="turn-display" style="width: 100%; margin-bottom: 16px;"></div>
   <div class="grid" id="grid"></div>
   <div class="keyboard" id="keyboard"></div>
 </div>
 
-<!-- Modals omitted for brevity - same as before -->
-<!-- Profile, Help, Result, Leaderboard modals -->
+<div class="modal-overlay" id="shop-modal">
+  <div class="modal">
+    <button class="modal-close" id="shop-close">✕</button>
+    <h2>🛍️ Kozmetik Mağazası</h2>
+    <div style="margin: 20px 0; padding: 16px; background: var(--surface3); border-radius: 12px; text-align: center;">
+      <div style="font-size: 28px; font-weight: 900; color: var(--accent4); font-family: var(--font-display);" id="shop-coins">0</div>
+      <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">Coin Bakiyesi</div>
+    </div>
+    
+    <div style="display: flex; gap: 8px; margin-bottom: 16px; border-bottom: 2px solid var(--border); padding-bottom: 8px;">
+      <button class="shop-tab active" data-tab="frames">🖼️ Çerçeveler</button>
+      <button class="shop-tab" data-tab="badges">🏅 Rozetler</button>
+      <button class="shop-tab" data-tab="colors">🎨 Renkler</button>
+    </div>
+    
+    <div id="shop-content" style="max-height: 400px; overflow-y: auto;"></div>
+  </div>
+</div>
 
 <div class="modal-overlay" id="profile-modal">
   <div class="modal">
@@ -1012,6 +1075,12 @@ header {
           <div id="profile-xp-bar" style="height: 100%; background: linear-gradient(90deg, var(--accent) 0%, var(--accent2) 100%); width: 0%;"></div>
         </div>
         <div style="font-size: 12px; color: var(--text-muted); font-family: var(--font-mono);" id="profile-xp-text">0 / 100 XP</div>
+        
+        <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border);">
+          <div style="font-size: 24px; font-weight: 900; color: var(--accent4); font-family: var(--font-display); margin-bottom: 4px;" id="profile-coins">0</div>
+          <div style="font-size: 12px; color: var(--text-muted);">Coin Bakiyesi</div>
+        </div>
+        
         <div style="margin-top: 16px; font-size: 13px; color: var(--text-muted);">
           <div>Kazanma: <span id="profile-wins" style="color: var(--accent);">0</span></div>
           <div>Kaybetme: <span id="profile-losses" style="color: var(--accent3);">0</span></div>
@@ -1038,15 +1107,15 @@ header {
     <div style="margin: 24px 0; padding: 20px; background: var(--surface2); border-radius: 12px;">
       <div style="font-weight: 700; margin-bottom: 12px; color: var(--accent);">🎮 Oyun Modları:</div>
       <div style="font-size: 13px; line-height: 1.6; color: var(--text-muted);">
-        <strong>📅 Günlük:</strong> Her gün yeni bir kelime. Herkes aynı kelimeyi tahmin eder!<br><br>
+        <strong>📅 Günlük:</strong> Her gün yeni bir kelime. Herkes aynı kelimeyi tahmin eder! Günde sadece 1 kez oynanabilir.<br><br>
         <strong>♾️ Sınırsız:</strong> İstediğin kadar oyna, pratik yap!<br><br>
-        <strong>⚔️ Rekabetçi:</strong> Sırayla tahmin yapın! Her iki oyuncu da ortak board kullanır. 6 tahmin sonra ekstra turlar açılır, 12. tahminde bilemezseniz beraberlik!
+        <strong>⚔️ Rekabetçi:</strong> Sırayla tahmin yapın! Her iki oyuncu da ortak board kullanır. 6 tahmin sonra ekstra turlar açılır, 12. tahminde bilemezseniz beraberlik! 30 saniyede tahmin yapmalısınız!
       </div>
     </div>
     <div style="margin: 16px 0; padding: 16px; background: linear-gradient(135deg, var(--surface2) 0%, var(--surface3) 100%); border: 1px solid var(--accent); border-radius: 12px; text-align: center;">
       <div style="font-family: var(--font-display); font-size: 14px; font-weight: 700; color: var(--accent); letter-spacing: 0.2em; margin-bottom: 4px;">POWERED BY</div>
       <div style="font-family: var(--font-display); font-size: 28px; font-weight: 900; background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">RELAQUENT</div>
-      <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Premium Gaming Experience</div>
+      <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">Premium Gaming Experience v2.0</div>
     </div>
     <button class="btn btn-primary" id="help-close-btn">Başla! 🎮</button>
   </div>
@@ -1090,9 +1159,47 @@ const WORD_LISTS = {
 };
 
 const RANKS = {
-  1: { name: "Yeni Doğmuş I", xpNeeded: 100 },
-  2: { name: "Yeni Doğmuş II", xpNeeded: 150 },
-  3: { name: "Yeni Doğmuş III", xpNeeded: 200 }
+  1:{name:"Yeni Doğmuş I",xpNeeded:0},
+  2:{name:"Yeni Doğmuş II",xpNeeded:100},
+  3:{name:"Yeni Doğmuş III",xpNeeded:250},
+  4:{name:"Kelime Avcısı I",xpNeeded:450},
+  5:{name:"Kelime Avcısı II",xpNeeded:700},
+  6:{name:"Kelime Avcısı III",xpNeeded:1000},
+  7:{name:"Usta Oyuncu I",xpNeeded:1400},
+  8:{name:"Usta Oyuncu II",xpNeeded:1900},
+  9:{name:"Usta Oyuncu III",xpNeeded:2500},
+  10:{name:"Efsane",xpNeeded:3200}
+};
+
+const COSMETICS = {
+  avatarFrames: [
+    { id: 'default', name: 'Varsayılan', cost: 0, emoji: '⬜' },
+    { id: 'bronze', name: 'Bronz Çerçeve', cost: 500, emoji: '🥉' },
+    { id: 'silver', name: 'Gümüş Çerçeve', cost: 1000, emoji: '🥈' },
+    { id: 'gold', name: 'Altın Çerçeve', cost: 2000, emoji: '🥇' },
+    { id: 'diamond', name: 'Elmas Çerçeve', cost: 5000, emoji: '💎' },
+    { id: 'fire', name: 'Ateş Çerçevesi', cost: 3000, emoji: '🔥' },
+    { id: 'ice', name: 'Buz Çerçevesi', cost: 3000, emoji: '❄️' },
+    { id: 'star', name: 'Yıldız Çerçevesi', cost: 4000, emoji: '⭐' }
+  ],
+  profileBadges: [
+    { id: 'winner', name: 'Kazanan', cost: 0, emoji: '🏆' },
+    { id: 'streak3', name: '3 Seri', cost: 300, emoji: '🔥' },
+    { id: 'streak5', name: '5 Seri', cost: 800, emoji: '🔥🔥' },
+    { id: 'streak10', name: '10 Seri', cost: 2000, emoji: '🔥🔥🔥' },
+    { id: 'master', name: 'Kelime Ustası', cost: 5000, emoji: '👑' },
+    { id: 'legend', name: 'Efsane', cost: 10000, emoji: '⚡' }
+  ],
+  profileColors: [
+    { id: 'default', name: 'Varsayılan', cost: 0, color: '#00ffb3' },
+    { id: 'purple', name: 'Mor', cost: 500, color: '#9b59b6' },
+    { id: 'red', name: 'Kırmızı', cost: 500, color: '#e74c3c' },
+    { id: 'blue', name: 'Mavi', cost: 500, color: '#3498db' },
+    { id: 'orange', name: 'Turuncu', cost: 500, color: '#e67e22' },
+    { id: 'pink', name: 'Pembe', cost: 800, color: '#ff0095' },
+    { id: 'cyan', name: 'Camgöbeği', cost: 800, color: '#00e1ff' },
+    { id: 'rainbow', name: 'Gökkuşağı', cost: 3000, gradient: true }
+  ]
 };
 
 const KB_ROWS = [
@@ -1116,7 +1223,7 @@ let keyStates = {};
 let currentGameId = null;
 let opponentData = null;
 let isMyTurn = false;
-let maxGuesses = 6; // Will extend to 12 in multiplayer
+let maxGuesses = 6;
 
 let playerProfile = {
   playerId: null,
@@ -1129,8 +1236,91 @@ let playerProfile = {
   losses: 0,
   draws: 0,
   gamesPlayed: 0,
-  rankedPoints: 1000
+  rankedPoints: 1000,
+  coins: 0,
+  dailyPlayedToday: null,
+  cosmetics: {
+    ownedFrames: ['default'],
+    ownedBadges: ['winner'],
+    ownedColors: ['default'],
+    equippedFrame: 'default',
+    equippedBadge: 'winner',
+    equippedColor: 'default'
+  }
 };
+
+// ===== SHOP SYSTEM =====
+let currentShopTab = 'frames';
+
+function renderShop(tab) {
+  currentShopTab = tab;
+  const content = document.getElementById('shop-content');
+  if (!content) return;
+  
+  document.querySelectorAll('.shop-tab').forEach(t => t.classList.remove('active'));
+  document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
+  
+  let items = [];
+  let owned = [];
+  let equipped = '';
+  
+  if (tab === 'frames') {
+    items = COSMETICS.avatarFrames;
+    owned = playerProfile.cosmetics?.ownedFrames || ['default'];
+    equipped = playerProfile.cosmetics?.equippedFrame || 'default';
+  } else if (tab === 'badges') {
+    items = COSMETICS.profileBadges;
+    owned = playerProfile.cosmetics?.ownedBadges || ['winner'];
+    equipped = playerProfile.cosmetics?.equippedBadge || 'winner';
+  } else if (tab === 'colors') {
+    items = COSMETICS.profileColors;
+    owned = playerProfile.cosmetics?.ownedColors || ['default'];
+    equipped = playerProfile.cosmetics?.equippedColor || 'default';
+  }
+  
+  content.innerHTML = items.map(item => {
+    const isOwned = owned.includes(item.id);
+    const isEquipped = equipped === item.id;
+    
+    return `
+      <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px; margin-bottom: 8px; background: ${isEquipped ? 'var(--surface3)' : 'var(--surface2)'}; border: 1px solid ${isEquipped ? 'var(--accent)' : 'var(--border)'}; border-radius: 12px;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="font-size: 28px;">${item.emoji || '⬜'}</div>
+          <div>
+            <div style="font-weight: 700; color: var(--text);">${item.name}</div>
+            <div style="font-size: 12px; color: var(--text-muted);">${isOwned ? (isEquipped ? '✅ Donatılmış' : '✓ Sahipsin') : item.cost + ' coin'}</div>
+          </div>
+        </div>
+        <div>
+          ${isOwned 
+            ? (isEquipped 
+              ? '<span style="color: var(--accent); font-weight: 700;">Kullanımda</span>' 
+              : `<button onclick="equipCosmetic('${tab}', '${item.id}')" style="padding: 8px 16px; background: var(--accent); border: none; border-radius: 8px; color: var(--bg); font-weight: 700; cursor: pointer;">Donat</button>`)
+            : `<button onclick="buyCosmetic('${tab}', '${item.id}')" style="padding: 8px 16px; background: linear-gradient(135deg, var(--accent2), var(--accent3)); border: none; border-radius: 8px; color: var(--bg); font-weight: 700; cursor: pointer;">Satın Al</button>`
+          }
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function buyCosmetic(type, itemId) {
+  if (!socket || !socket.connected) {
+    showToast('Sunucuya bağlanılamıyor!', true);
+    return;
+  }
+  
+  socket.emit('cosmetic:buy', { itemType: type === 'frames' ? 'frame' : type === 'badges' ? 'badge' : 'color', itemId });
+}
+
+function equipCosmetic(type, itemId) {
+  if (!socket || !socket.connected) {
+    showToast('Sunucuya bağlanılamıyor!', true);
+    return;
+  }
+  
+  socket.emit('cosmetic:equip', { itemType: type === 'frames' ? 'frame' : type === 'badges' ? 'badge' : 'color', itemId });
+}
 
 // ===== INITIALIZATION =====
 function init() {
@@ -1174,8 +1364,8 @@ function loadProfile() {
 }
 
 function updateProfileDisplay() {
-  const currentRank = RANKS[Math.min(playerProfile.level, 100)] || RANKS[1];
-  const nextRank = RANKS[Math.min(playerProfile.level + 1, 100)];
+  const currentRank = RANKS[Math.min(playerProfile.level, 10)] || RANKS[1];
+  const nextRank = RANKS[Math.min(playerProfile.level + 1, 10)];
   const xpNeeded = nextRank ? nextRank.xpNeeded - playerProfile.totalXP : 0;
   const xpProgress = nextRank && xpNeeded > 0 ? ((playerProfile.currentXP / xpNeeded) * 100) : 100;
 
@@ -1191,7 +1381,6 @@ function buildGrid() {
   grid.innerHTML = '';
   board = [];
 
-  // Always start with 12 rows for multiplayer
   const totalRows = gameMode === 'multiplayer' ? 12 : 6;
   maxGuesses = totalRows;
 
@@ -1255,7 +1444,6 @@ function handleKey(key) {
     return;
   }
   
-  // Multiplayer modunda sıra kontrolü
   if (gameMode === 'multiplayer' && currentGameId && !isMyTurn) {
     console.log('❌ Blocked: Not your turn in multiplayer');
     showToast('Sıran değil! ⏳', true);
@@ -1343,6 +1531,10 @@ function submitGuess() {
       const xpGained = 50 + (maxGuesses - currentRow) * 10;
       updatePlayerLevel(xpGained);
       
+      if (gameMode === 'daily' && socket && socket.connected) {
+        socket.emit('daily:complete');
+      }
+      
       setTimeout(() => {
         showResultModal({
           result: 'win',
@@ -1404,13 +1596,14 @@ function updatePlayerLevel(xpGained) {
   playerProfile.currentXP += xpGained;
 
   let leveledUp = false;
-  while (playerProfile.level < 100) {
-    const nextRank = RANKS[playerProfile.level + 1];
+  while (playerProfile.level < 10) {
+    const nextRank = RANKS[Math.min(playerProfile.level + 1, 10)];
     if (!nextRank) break;
     if (playerProfile.totalXP >= nextRank.xpNeeded) {
       playerProfile.level++;
       playerProfile.rank = nextRank.name;
       playerProfile.currentXP = 0;
+      playerProfile.coins = (playerProfile.coins || 0) + 500;
       leveledUp = true;
     } else {
       break;
@@ -1430,7 +1623,6 @@ function revealRow(row, guess, result, callback) {
   result.forEach((res, i) => {
     const tile = board[row][i];
     
-    // First set the letter
     tile.textContent = guessArr[i];
     tile.classList.add('filled');
     
@@ -1525,29 +1717,18 @@ function newGame() {
   currentCol = 0;
   currentGuess = [];
   inputEnabled = true;
-  // DON'T RESET isMyTurn HERE - it's set by game:start event!
   
   buildGrid();
   buildKeyboard();
 }
 
 function startDailyGame() {
-  const today = new Date();
-  const todayStr = today.toISOString().split('T')[0];
-  const dayOfYear = Math.floor((today - new Date(today.getFullYear(), 0, 0)) / 1000 / 60 / 60 / 24);
-  const list = WORD_LISTS[wordLength];
-  
-  if (!list || list.length === 0) {
-    showToast('Bu uzunluk için kelime yok!', true);
+  if (!socket || !socket.connected) {
+    showToast('Sunucuya bağlanılamıyor!', true);
     return;
   }
   
-  targetWord = list[dayOfYear % list.length];
-  console.log('📅 Günlük kelime başladı');
-  
-  newGame();
-  enableInput();
-  showToast('📅 Günün kelimesi başladı!');
+  socket.emit('daily:check');
 }
 
 function startUnlimitedGame() {
@@ -1626,7 +1807,6 @@ function connectToServer() {
       opponentData = data.opponent;
       wordLength = data.wordLength;
       
-      // CRITICAL: Set isMyTurn BEFORE calling newGame()
       isMyTurn = data.yourTurn;
       console.log('✅ Set isMyTurn to:', isMyTurn);
       
@@ -1636,8 +1816,8 @@ function connectToServer() {
       document.getElementById('queue-section').style.display = 'none';
       
       showOpponentPanel();
+      document.getElementById('chat-panel').style.display = 'block';
       
-      // Build grid but don't reset isMyTurn
       newGame();
       
       console.log('After newGame - isMyTurn:', isMyTurn);
@@ -1668,7 +1848,6 @@ function connectToServer() {
       console.log('====================================');
       console.log('');
       
-      // Update shared board
       const { rowIndex, guess, result } = data;
       
       revealRow(rowIndex, guess, result, () => {
@@ -1706,12 +1885,89 @@ function connectToServer() {
       
       disableInput();
       updateTurnDisplay(false, '');
+      document.getElementById('chat-panel').style.display = 'none';
       
       setTimeout(() => showResultModalMultiplayer(data), 1000);
     });
 
     socket.on('leaderboard:update', (data) => {
       renderLeaderboard(data.leaderboard);
+    });
+    
+    socket.on('online:count', (data) => {
+      document.getElementById('online-count-num').textContent = data.count || 0;
+    });
+
+    socket.on('chat:message', (data) => {
+      const chatBox = document.getElementById('chat-messages');
+      if (!chatBox) return;
+      
+      const msg = document.createElement('div');
+      msg.style.cssText = 'padding: 8px; margin-bottom: 6px; background: var(--surface3); border-radius: 8px; font-size: 13px; animation: fadeIn 0.3s;';
+      msg.innerHTML = `<strong style="color: var(--accent);">${data.nick}:</strong> <span style="color: var(--text);">${data.message}</span>`;
+      chatBox.appendChild(msg);
+      chatBox.scrollTop = chatBox.scrollHeight;
+    });
+
+    socket.on('turn:timeout', (data) => {
+      showToast(data.message, true);
+    });
+
+    socket.on('game:turn:update', (data) => {
+      isMyTurn = data.yourTurn;
+      currentRow = data.nextRow;
+      if (data.yourTurn) {
+        enableInput();
+      } else {
+        disableInput();
+      }
+      updateTurnDisplay(data.yourTurn, opponentData?.nick || 'Rakip');
+    });
+
+    socket.on('daily:status', (data) => {
+      if (gameMode !== 'daily') return;
+      
+      if (!data.canPlay) {
+        showToast('Bugünün kelimesini zaten oynadın! Yarın tekrar gel. 📅', true);
+        gameOver = true;
+        disableInput();
+        targetWord = '?????';
+        return;
+      }
+      
+      const today = new Date();
+      const dayOfYear = Math.floor((today - new Date(today.getFullYear(), 0, 0)) / 1000 / 60 / 60 / 24);
+      const list = WORD_LISTS[wordLength];
+      
+      if (!list || list.length === 0) {
+        showToast('Bu uzunluk için kelime yok!', true);
+        return;
+      }
+      
+      targetWord = list[dayOfYear % list.length];
+      newGame();
+      enableInput();
+      showToast('📅 Günün kelimesi başladı!');
+    });
+
+    socket.on('daily:completed', () => {
+      console.log('✅ Daily game completed and recorded');
+    });
+
+    socket.on('cosmetic:purchased', (data) => {
+      playerProfile.coins = data.newCoins;
+      playerProfile.cosmetics = data.cosmetics;
+      saveProfile();
+      updateProfileDisplay();
+      renderShop(currentShopTab);
+      showToast('✅ Satın alındı!');
+    });
+
+    socket.on('cosmetic:equipped', (data) => {
+      playerProfile.cosmetics = data.cosmetics;
+      saveProfile();
+      updateProfileDisplay();
+      showToast('✅ Donatıldı!');
     });
 
     socket.on('error', (data) => {
@@ -1883,6 +2139,7 @@ function showResultModalMultiplayer(data) {
   const msg = document.getElementById('result-msg');
   const answerDiv = document.getElementById('result-answer');
   const wordEl = document.getElementById('result-word');
+  const xpDiv = document.getElementById('result-xp');
   const xpAmount = document.getElementById('result-xp-amount');
 
   if (data.result === 'win') {
@@ -1902,6 +2159,14 @@ function showResultModalMultiplayer(data) {
   }
 
   xpAmount.textContent = `+${data.xpGained}`;
+  
+  const coinsHTML = `
+    <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);">
+      <div style="font-size: 14px; color: var(--text-muted); margin-bottom: 8px;">Coin Kazandın!</div>
+      <div style="font-size: 28px; font-weight: 900; color: var(--accent4); font-family: var(--font-display);">+${data.coinsGained || 0}</div>
+    </div>
+  `;
+  xpDiv.innerHTML = xpDiv.innerHTML.replace(/<div style="margin-top.*?<\/div>/s, '') + coinsHTML;
   
   setTimeout(() => modal.classList.add('show'), 600);
 }
@@ -1946,8 +2211,9 @@ document.getElementById('user-profile').addEventListener('click', () => {
   document.getElementById('nick-input').value = playerProfile.nick;
   document.getElementById('profile-level').textContent = playerProfile.level;
   document.getElementById('profile-rank').textContent = playerProfile.rank || 'Yeni Doğmuş I';
+  document.getElementById('profile-coins').textContent = playerProfile.coins || 0;
   
-  const nextRank = RANKS[Math.min(playerProfile.level + 1, 100)] || RANKS[1];
+  const nextRank = RANKS[Math.min(playerProfile.level + 1, 10)] || RANKS[1];
   const xpNeeded = nextRank ? nextRank.xpNeeded - playerProfile.totalXP : 0;
   const xpProgress = nextRank && xpNeeded > 0 ? ((playerProfile.currentXP / xpNeeded) * 100) : 100;
   
@@ -2007,6 +2273,37 @@ document.getElementById('leaderboard-close').addEventListener('click', () => {
 
 document.getElementById('leaderboard-close-btn').addEventListener('click', () => {
   document.getElementById('leaderboard-modal').classList.remove('show');
+});
+
+document.getElementById('shop-btn').addEventListener('click', () => {
+  document.getElementById('shop-coins').textContent = playerProfile.coins || 0;
+  renderShop('frames');
+  document.getElementById('shop-modal').classList.add('show');
+});
+
+document.getElementById('shop-close').addEventListener('click', () => {
+  document.getElementById('shop-modal').classList.remove('show');
+});
+
+document.querySelectorAll('.shop-tab').forEach(tab => {
+  tab.addEventListener('click', (e) => {
+    renderShop(e.target.dataset.tab);
+  });
+});
+
+document.getElementById('chat-send').addEventListener('click', () => {
+  const input = document.getElementById('chat-input');
+  const message = input.value.trim();
+  if (message && currentGameId && socket && socket.connected) {
+    socket.emit('chat:message', { gameId: currentGameId, message });
+    input.value = '';
+  }
+});
+
+document.getElementById('chat-input').addEventListener('keypress', (e) => {
+  if (e.key === 'Enter') {
+    document.getElementById('chat-send').click();
+  }
 });
 
 document.querySelectorAll('.modal-overlay').forEach(overlay => {
