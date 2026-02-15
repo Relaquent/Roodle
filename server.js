@@ -726,6 +726,66 @@ io.on('connection',(socket)=>{
     }
   });
   
+  socket.on('case:open', (data) => {
+    try {
+      const { caseId } = data;
+      const player = players.get(socket.id);
+      if (!player) return;
+      
+      // Define case rewards (same as frontend)
+      const caseRewards = [
+        // Coins
+        { type: 'coins', amount: 100, rarity: 'common', weight: 15, name: '100 Coin' },
+        { type: 'coins', amount: 250, rarity: 'uncommon', weight: 10, name: '250 Coin' },
+        { type: 'coins', amount: 500, rarity: 'rare', weight: 5, name: '500 Coin' },
+        // XP
+        { type: 'xp', amount: 50, rarity: 'common', weight: 10, name: '50 XP' },
+        { type: 'xp', amount: 100, rarity: 'uncommon', weight: 7, name: '100 XP' },
+        { type: 'xp', amount: 250, rarity: 'rare', weight: 3, name: '250 XP' },
+        // Frames
+        { type: 'frame', id: 'bronze', rarity: 'common', weight: 12, name: 'Bronz Şövalye' },
+        { type: 'frame', id: 'silver', rarity: 'uncommon', weight: 8, name: 'Gümüş Lejyon' },
+        { type: 'frame', id: 'gold', rarity: 'rare', weight: 5, name: 'Altın İmparator' },
+        { type: 'frame', id: 'fire', rarity: 'rare', weight: 4, name: 'Ateş Efendisi' },
+        { type: 'frame', id: 'ice', rarity: 'rare', weight: 4, name: 'Buz Kralı' },
+        { type: 'frame', id: 'diamond', rarity: 'epic', weight: 2, name: 'Elmas Titan' },
+        // Badges
+        { type: 'badge', id: 'streak3', rarity: 'common', weight: 10, name: 'Ateş Başlangıcı' },
+        { type: 'badge', id: 'streak5', rarity: 'uncommon', weight: 6, name: 'Alev Yüreği' },
+        { type: 'badge', id: 'speedster', rarity: 'rare', weight: 3, name: 'Hız Şeytanı' },
+        // Colors
+        { type: 'color', id: 'crimson', rarity: 'common', weight: 10, name: 'Kızıl Öfke' },
+        { type: 'color', id: 'royal', rarity: 'common', weight: 10, name: 'Kraliyet Mavisi' },
+        { type: 'color', id: 'toxic', rarity: 'uncommon', weight: 7, name: 'Zehir Yeşili' },
+        { type: 'color', id: 'cyberpink', rarity: 'rare', weight: 4, name: 'Cyber Pembe' },
+        { type: 'color', id: 'gold', rarity: 'rare', weight: 3, name: 'Altın Işıltısı' }
+      ];
+      
+      // Weighted random selection
+      const totalWeight = caseRewards.reduce((sum, r) => sum + r.weight, 0);
+      let random = Math.random() * totalWeight;
+      
+      let selectedReward = caseRewards[0];
+      for (const reward of caseRewards) {
+        random -= reward.weight;
+        if (random <= 0) {
+          selectedReward = reward;
+          break;
+        }
+      }
+      
+      console.log(`🎰 ${player.nick} opened case, got:`, selectedReward.name);
+      
+      // Send reward to client
+      socket.emit('case:reward', {
+        reward: selectedReward
+      });
+      
+    } catch (error) {
+      console.error('❌ Case open error:', error);
+    }
+  });
+  
   socket.on('daily:check', () => {
     try {
       const player = players.get(socket.id);
