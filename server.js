@@ -142,9 +142,13 @@ function getPlayerData(playerId){
         ownedFrames: ['default'],
         ownedBadges: ['winner'],
         ownedColors: ['default'],
+        ownedBackgrounds: ['none'],
+        ownedTitles: ['none'],
         equippedFrame: 'default',
         equippedBadge: 'winner',
-        equippedColor: 'default'
+        equippedColor: 'default',
+        equippedBackground: 'none',
+        equippedTitle: 'none'
       }
     };
   }
@@ -408,7 +412,18 @@ function evaluateGuess(guess,target){
 }
 
 function broadcastOnlineCount() {
-  io.emit('online:count', { count: players.size });
+  const onlinePlayers = Array.from(players.values()).map(p => ({
+    playerId: p.playerId,
+    nick: p.nick,
+    level: p.level || 1,
+    rank: getPlayerData(p.playerId).rank,
+    inGame: p.currentGameId ? true : false
+  }));
+  
+  io.emit('online:count', { 
+    count: players.size,
+    players: onlinePlayers
+  });
 }
 
 // Broadcast online count every 5 seconds
@@ -606,22 +621,39 @@ io.on('connection',(socket)=>{
       
       const playerData = getPlayerData(player.playerId);
       
-      let item = null;
+      // Simple cost lookup - in real app, fetch from database
+      const costs = {
+        frame: { default:0, bronze:800, silver:1500, gold:3000, diamond:6000, fire:4500, ice:4500, lightning:5500, cosmic:8000, phoenix:10000, shadow:7500, rainbow:9000, galaxy:12000 },
+        badge: { winner:0, streak3:500, streak5:1200, streak10:3000, speedster:2500, perfectionist:4000, master:6000, veteran:5000, legend:12000, unbeatable:15000, genius:8000, collector:10000 },
+        color: { default:0, crimson:800, royal:800, toxic:1200, purple:1200, sunset:1500, cyberpink:2000, electric:2000, gold:3000, rainbow:5000, lava:4500, ocean:4500, galaxy:6000, matrix:7000, prismatic:10000 },
+        background: { none:0, stars:2000, matrix:3500, fire:4000, lightning:5000, cosmic:6000, aurora:7500, portal:10000 },
+        title: { none:0, glow:1500, wave:2500, shake:2500, rainbow:4000, glitch:5000, fire:6000, hologram:8000 }
+      };
+      
       let ownedArray = null;
+      let cost = 0;
       
       if (itemType === 'frame') {
-        item = COSMETICS.avatarFrames.find(f => f.id === itemId);
         ownedArray = playerData.cosmetics.ownedFrames;
+        cost = costs.frame[itemId] || 999999;
       } else if (itemType === 'badge') {
-        item = COSMETICS.profileBadges.find(b => b.id === itemId);
         ownedArray = playerData.cosmetics.ownedBadges;
+        cost = costs.badge[itemId] || 999999;
       } else if (itemType === 'color') {
-        item = COSMETICS.profileColors.find(c => c.id === itemId);
         ownedArray = playerData.cosmetics.ownedColors;
+        cost = costs.color[itemId] || 999999;
+      } else if (itemType === 'background') {
+        ownedArray = playerData.cosmetics.ownedBackgrounds || ['none'];
+        if (!playerData.cosmetics.ownedBackgrounds) playerData.cosmetics.ownedBackgrounds = ['none'];
+        cost = costs.background[itemId] || 999999;
+      } else if (itemType === 'title') {
+        ownedArray = playerData.cosmetics.ownedTitles || ['none'];
+        if (!playerData.cosmetics.ownedTitles) playerData.cosmetics.ownedTitles = ['none'];
+        cost = costs.title[itemId] || 999999;
       }
       
-      if (!item) {
-        socket.emit('error', { message: 'Geçersiz kozmetik!' });
+      if (!ownedArray) {
+        socket.emit('error', { message: 'Geçersiz kozmetik türü!' });
         return;
       }
       
@@ -630,12 +662,12 @@ io.on('connection',(socket)=>{
         return;
       }
       
-      if (playerData.coins < item.cost) {
+      if (playerData.coins < cost) {
         socket.emit('error', { message: 'Yeterli coinin yok!' });
         return;
       }
       
-      playerData.coins -= item.cost;
+      playerData.coins -= cost;
       ownedArray.push(itemId);
       
       persistentPlayers[player.playerId] = playerData;
@@ -670,6 +702,14 @@ io.on('connection',(socket)=>{
       } else if (itemType === 'color') {
         if (!playerData.cosmetics.ownedColors.includes(itemId)) return;
         playerData.cosmetics.equippedColor = itemId;
+      } else if (itemType === 'background') {
+        if (!playerData.cosmetics.ownedBackgrounds) playerData.cosmetics.ownedBackgrounds = ['none'];
+        if (!playerData.cosmetics.ownedBackgrounds.includes(itemId)) return;
+        playerData.cosmetics.equippedBackground = itemId;
+      } else if (itemType === 'title') {
+        if (!playerData.cosmetics.ownedTitles) playerData.cosmetics.ownedTitles = ['none'];
+        if (!playerData.cosmetics.ownedTitles.includes(itemId)) return;
+        playerData.cosmetics.equippedTitle = itemId;
       }
       
       persistentPlayers[player.playerId] = playerData;
