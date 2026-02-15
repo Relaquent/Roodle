@@ -1425,13 +1425,20 @@ function updatePlayerLevel(xpGained) {
 
 // ===== REVEAL =====
 function revealRow(row, guess, result, callback) {
+  const guessArr = guess.split('');
+  
   result.forEach((res, i) => {
     const tile = board[row][i];
+    
+    // First set the letter
+    tile.textContent = guessArr[i];
+    tile.classList.add('filled');
+    
     setTimeout(() => {
       tile.classList.add('reveal');
       setTimeout(() => {
         tile.classList.add(res);
-        updateKeyState(guess[i], res);
+        updateKeyState(guessArr[i], res);
       }, 300);
     }, i * 150);
   });
@@ -1651,7 +1658,15 @@ function connectToServer() {
     });
 
     socket.on('game:board:update', (data) => {
-      console.log('📋 Board update:', data);
+      console.log('');
+      console.log('📋 ========== BOARD UPDATE ==========');
+      console.log('   Row Index:', data.rowIndex);
+      console.log('   Guess:', data.guess);
+      console.log('   Result:', data.result);
+      console.log('   Next Row:', data.nextRow);
+      console.log('   Your Turn:', data.yourTurn);
+      console.log('====================================');
+      console.log('');
       
       // Update shared board
       const { rowIndex, guess, result } = data;
@@ -1661,15 +1676,18 @@ function connectToServer() {
         currentCol = 0;
         currentGuess = [];
         
+        console.log('✅ Board revealed, updating turn display');
         updateTurnDisplay(data.yourTurn, opponentData?.nick || 'Rakip');
         
         if (data.yourTurn) {
           isMyTurn = true;
           enableInput();
           showToast('Senin sıran! 🎯');
+          console.log('✅ Your turn now');
         } else {
           isMyTurn = false;
           disableInput();
+          console.log('⏳ Waiting for opponent');
         }
       });
     });
