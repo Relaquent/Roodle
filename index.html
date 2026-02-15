@@ -1243,13 +1243,26 @@ document.addEventListener('keydown', e => {
 });
 
 function handleKey(key) {
-  if (gameOver || !inputEnabled) return;
+  console.log(`🔑 Key pressed: ${key}`);
+  console.log(`   gameOver: ${gameOver}`);
+  console.log(`   inputEnabled: ${inputEnabled}`);
+  console.log(`   gameMode: ${gameMode}`);
+  console.log(`   currentGameId: ${currentGameId}`);
+  console.log(`   isMyTurn: ${isMyTurn}`);
+  
+  if (gameOver || !inputEnabled) {
+    console.log('❌ Blocked: gameOver or input disabled');
+    return;
+  }
   
   // Multiplayer modunda sıra kontrolü
   if (gameMode === 'multiplayer' && currentGameId && !isMyTurn) {
+    console.log('❌ Blocked: Not your turn in multiplayer');
     showToast('Sıran değil! ⏳', true);
     return;
   }
+  
+  console.log('✅ Key accepted, processing...');
   
   if (key === 'ENTER') submitGuess();
   else if (key === '⌫') deleteLetter();
@@ -1593,7 +1606,14 @@ function connectToServer() {
     });
 
     socket.on('game:start', (data) => {
-      console.log('🎮 Game started:', data);
+      console.log('');
+      console.log('🎮 ========== GAME START RECEIVED ==========');
+      console.log('   Game ID:', data.gameId);
+      console.log('   Opponent:', data.opponent.nick);
+      console.log('   Word Length:', data.wordLength);
+      console.log('   YOUR TURN:', data.yourTurn);
+      console.log('===========================================');
+      console.log('');
       
       currentGameId = data.gameId;
       opponentData = data.opponent;
@@ -1607,15 +1627,21 @@ function connectToServer() {
       showOpponentPanel();
       newGame(); // This builds 12-row grid
       
+      console.log('Setting isMyTurn to:', isMyTurn);
+      
       if (isMyTurn) {
+        console.log('✅ MY TURN - Enabling input');
         enableInput();
         updateTurnDisplay(true, opponentData.nick);
         showToast(`🎮 Senin sıran! İlk tahmin sende!`);
       } else {
+        console.log('⏳ WAITING - Disabling input');
         disableInput();
         updateTurnDisplay(false, opponentData.nick);
         showToast(`🎮 ${opponentData.nick} başlıyor, bekle!`);
       }
+      
+      console.log('After setup - isMyTurn:', isMyTurn, 'inputEnabled:', inputEnabled);
     });
 
     socket.on('game:board:update', (data) => {
