@@ -1119,6 +1119,42 @@ header {
     <button class="modal-close" id="profile-close">✕</button>
     <h2>👤 Profil</h2>
     <div style="margin: 24px 0;">
+      <label style="display: block; margin-bottom: 12px; font-weight: 700;">Profil Fotoğrafı:</label>
+      
+      <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 16px;">
+        <div id="profile-picture-preview" style="
+          width: 80px;
+          height: 80px;
+          border-radius: 12px;
+          background: linear-gradient(135deg, var(--accent), var(--accent2));
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 32px;
+          color: var(--bg);
+          font-weight: 900;
+          overflow: hidden;
+          border: 2px solid var(--border);
+        ">
+          🎮
+        </div>
+        
+        <div style="flex: 1;">
+          <input type="file" id="profile-picture-input" accept="image/*" style="display: none;">
+          <button class="btn btn-secondary" id="upload-picture-btn" style="width: 100%; margin-bottom: 8px;">
+            📷 Fotoğraf Yükle
+          </button>
+          <button class="btn btn-secondary" id="remove-picture-btn" style="width: 100%;">
+            🗑️ Fotoğrafı Kaldır
+          </button>
+        </div>
+      </div>
+      
+      <div style="font-size: 11px; color: var(--text-muted); margin-top: 8px;">
+        Maksimum dosya boyutu: 2MB. Desteklenen formatlar: JPG, PNG, GIF
+      </div>
+    </div>
+    <div style="margin: 24px 0;">
       <label style="display: block; margin-bottom: 12px; font-weight: 700;">Takma Adın:</label>
       <input type="text" id="nick-input" maxlength="16" placeholder="Adını gir..." style="width: 100%; padding: 14px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface2); color: var(--text); font-family: var(--font-body); font-size: 16px;">
       
@@ -1404,6 +1440,7 @@ const KB_ROWS = [
 
 // ===== GAME STATE =====
 let socket = null;
+let currentProfilePicture = null;
 let gameMode = 'daily';
 let wordLength = 5;
 let targetWord = '';
@@ -1704,7 +1741,14 @@ function updateProfileDisplay() {
   document.getElementById('user-nick').textContent = playerProfile.nick;
   document.getElementById('user-rank').textContent = playerProfile.rank || currentRank.name;
   document.getElementById('user-xp-fill').style.width = `${Math.min(xpProgress, 100)}%`;
-  document.getElementById('user-avatar').textContent = (playerProfile.nick || 'O')[0].toUpperCase();
+  
+  // NEW: Profile picture support
+  const avatarEl = document.getElementById('user-avatar');
+  if (playerProfile.profilePicture) {
+    avatarEl.innerHTML = `<img src="${playerProfile.profilePicture}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px;">`;
+  } else {
+    avatarEl.textContent = (playerProfile.nick || 'O')[0].toUpperCase();
+  }
 }
 
 // ===== GRID & KEYBOARD =====
@@ -2118,6 +2162,15 @@ function connectToServer() {
       }
     });
 
+    socket.on('profile:updated', (data) => {
+  playerProfile.nick = data.nick;
+  playerProfile.profilePicture = data.profilePicture;
+  saveProfile();
+  updateProfileDisplay();
+  showToast('✅ Profil güncellendi!');
+  document.getElementById('profile-modal').classList.remove('show');
+});
+
     socket.on('queue:joined', () => {
       console.log('🎯 Joined queue');
       document.getElementById('queue-btn').textContent = 'Sıradan Çık';
@@ -2373,7 +2426,12 @@ function renderQueuePlayers(players) {
   
   container.innerHTML = players.map(p => `
     <div class="queue-player">
-      <div class="player-avatar">${(p.nick || 'O')[0]}</div>
+      <div class="player-avatar">
+        ${p.profilePicture 
+          ? `<img src="${p.profilePicture}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px;">`
+          : (p.nick || 'O')[0]
+        }
+      </div>
       <div class="player-details">
         <div class="player-name">${p.nick || 'Oyuncu'}</div>
         <div class="player-rank">${p.rank || 'Yeni Doğmuş I'}</div>
@@ -2385,7 +2443,14 @@ function renderQueuePlayers(players) {
 function showOpponentPanel() {
   if (!opponentData) return;
   document.getElementById('opponent-panel').style.display = 'block';
-  document.getElementById('opponent-avatar').textContent = (opponentData.nick || 'O')[0];
+  
+  const avatarEl = document.getElementById('opponent-avatar');
+  if (opponentData.profilePicture) {
+    avatarEl.innerHTML = `<img src="${opponentData.profilePicture}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 8px;">`;
+  } else {
+    avatarEl.textContent = (opponentData.nick || 'O')[0];
+  }
+  
   document.getElementById('opponent-name').textContent = opponentData.nick || 'Rakip';
   document.getElementById('opponent-rank').textContent = opponentData.rank || '-';
   document.getElementById('opponent-progress').textContent = 'Hazır';
@@ -2468,15 +2533,17 @@ function renderOnlinePlayers() {
     return;
   }
   
-  // Sort by level descending
   const sorted = [...onlinePlayers].sort((a, b) => (b.level || 1) - (a.level || 1));
   
   listEl.innerHTML = sorted.map((player, index) => {
     const isMe = player.playerId === playerProfile.playerId;
     return `
       <div style="display: flex; align-items: center; gap: 10px; padding: 10px; background: ${isMe ? 'var(--surface3)' : 'var(--surface)'}; border: 1px solid ${isMe ? 'var(--accent)' : 'var(--border)'}; border-radius: 10px; transition: all 0.3s;">
-        <div style="width: 32px; height: 32px; background: linear-gradient(135deg, var(--accent), var(--accent2)); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800; color: var(--bg); flex-shrink: 0;">
-          ${(player.nick || 'O')[0].toUpperCase()}
+        <div style="width: 32px; height: 32px; background: linear-gradient(135deg, var(--accent), var(--accent2)); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 800; color: var(--bg); flex-shrink: 0; overflow: hidden;">
+          ${player.profilePicture 
+            ? `<img src="${player.profilePicture}" style="width: 100%; height: 100%; object-fit: cover;">`
+            : (player.nick || 'O')[0].toUpperCase()
+          }
         </div>
         <div style="flex: 1; min-width: 0;">
           <div style="font-size: 13px; font-weight: 700; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
@@ -2676,8 +2743,11 @@ function renderLeaderboard(data) {
         
         return `
           <div style="display: flex; align-items: center; gap: 12px; padding: 14px; background: ${isTopThree ? 'linear-gradient(135deg, var(--surface2), var(--surface3))' : 'var(--surface2)'}; border: 1px solid ${isTopThree ? 'var(--accent)' : 'var(--border)'}; border-radius: 12px;">
-            <div style="min-width: 50px; height: 50px; background: ${index < 3 ? (index === 0 ? 'linear-gradient(135deg, #FFD700, #FFA500)' : index === 1 ? 'linear-gradient(135deg, #C0C0C0, #808080)' : 'linear-gradient(135deg, #CD7F32, #8B4513)') : 'var(--surface3)'}; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 20px; color: ${isTopThree ? '#000' : 'var(--text)'}; font-family: var(--font-display);">
-              ${medalEmoji || (index + 1)}
+            <div style="min-width: 50px; height: 50px; background: ${index < 3 ? (index === 0 ? 'linear-gradient(135deg, #FFD700, #FFA500)' : index === 1 ? 'linear-gradient(135deg, #C0C0C0, #808080)' : 'linear-gradient(135deg, #CD7F32, #8B4513)') : 'var(--surface3)'}; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 20px; color: ${isTopThree ? '#000' : 'var(--text)'}; font-family: var(--font-display); overflow: hidden;">
+              ${player.profilePicture && !isTopThree
+                ? `<img src="${player.profilePicture}" style="width: 100%; height: 100%; object-fit: cover;">`
+                : (medalEmoji || (index + 1))
+              }
             </div>
             <div style="flex: 1; min-width: 0;">
               <div style="font-size: 16px; font-weight: 700; color: var(--text); margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
@@ -2804,7 +2874,17 @@ document.getElementById('result-new-btn').addEventListener('click', () => {
 });
 
 document.getElementById('user-profile').addEventListener('click', () => {
+
+  // Update profile picture preview
+  const preview = document.getElementById('profile-picture-preview');
+  if (playerProfile.profilePicture) {
+    preview.innerHTML = `<img src="${playerProfile.profilePicture}" style="width: 100%; height: 100%; object-fit: cover;">`;
+  } else {
+    preview.innerHTML = '🎮';
+  }
+  currentProfilePicture = playerProfile.profilePicture;
   document.getElementById('nick-input').value = playerProfile.nick;
+
   document.getElementById('profile-level').textContent = playerProfile.level;
   document.getElementById('profile-rank').textContent = playerProfile.rank || 'Yeni Doğmuş I';
   document.getElementById('profile-coins').textContent = playerProfile.coins || 0;
@@ -2826,13 +2906,17 @@ document.getElementById('user-profile').addEventListener('click', () => {
 
 document.getElementById('save-profile-btn').addEventListener('click', () => {
   const newNick = document.getElementById('nick-input').value.trim();
+  
+  if (!socket || !socket.connected) {
+    showToast('Sunucuya bağlanılamıyor!', true);
+    return;
+  }
+  
   if (newNick && newNick.length > 0) {
-    playerProfile.nick = newNick.substring(0, 16);
-    saveProfile();
-    updateProfileDisplay();
-    registerPlayer();
-    showToast('✅ Profil kaydedildi!');
-    document.getElementById('profile-modal').classList.remove('show');
+    socket.emit('profile:update', {
+      nick: newNick.substring(0, 16),
+      profilePicture: currentProfilePicture !== undefined ? currentProfilePicture : playerProfile.profilePicture
+    });
   } else {
     showToast('Lütfen bir isim girin!', true);
   }
@@ -3014,6 +3098,48 @@ document.addEventListener('click', (e) => {
   if (panel.style.display === 'block' && !panel.contains(e.target) && !counter.contains(e.target)) {
     panel.style.display = 'none';
   }
+});
+
+// Profile picture upload
+document.getElementById('upload-picture-btn').addEventListener('click', () => {
+  document.getElementById('profile-picture-input').click();
+});
+
+document.getElementById('profile-picture-input').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  
+  // Check file size (2MB max)
+  if (file.size > 2 * 1024 * 1024) {
+    showToast('Dosya çok büyük! Maksimum 2MB', true);
+    return;
+  }
+  
+  // Check file type
+  if (!file.type.startsWith('image/')) {
+    showToast('Sadece resim dosyaları!', true);
+    return;
+  }
+  
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    const base64 = event.target.result;
+    currentProfilePicture = base64;
+    
+    // Update preview
+    const preview = document.getElementById('profile-picture-preview');
+    preview.innerHTML = `<img src="${base64}" style="width: 100%; height: 100%; object-fit: cover;">`;
+    
+    showToast('✅ Fotoğraf yüklendi! Kaydet butonuna basın.');
+  };
+  reader.readAsDataURL(file);
+});
+
+document.getElementById('remove-picture-btn').addEventListener('click', () => {
+  currentProfilePicture = null;
+  const preview = document.getElementById('profile-picture-preview');
+  preview.innerHTML = '🎮';
+  showToast('Fotoğraf kaldırıldı! Kaydet butonuna basın.');
 });
 
 // START
