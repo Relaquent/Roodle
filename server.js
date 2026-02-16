@@ -15,11 +15,13 @@ const io = socketIO(server, {
   },
   pingTimeout: 60000,
   pingInterval: 25000,
-  transports: ['websocket', 'polling']
+  transports: ['websocket', 'polling'],
+  maxHttpBufferSize: 5e6 // 5MB for profile pictures
 });
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '5mb' }));
+app.use(express.static('public'));
 
 // ===== DATA STORAGE =====
 const DATA_DIR = path.join(__dirname, 'data');
@@ -60,8 +62,37 @@ function saveData() {
   }
 }
 
+// ===== NEW: LEADERBOARD UPDATE FUNCTION =====
+function updateLeaderboard() {
+  try {
+    leaderboard = Object.values(persistentPlayers)
+      .filter(p => p.gamesPlayed > 0)
+      .map(p => ({
+        playerId: p.playerId,
+        nick: p.nick || 'Oyuncu',
+        rankedPoints: p.rankedPoints || 1000,
+        level: p.level || 1,
+        rank: p.rank || 'Yeni Doğmuş I',
+        wins: p.wins || 0,
+        losses: p.losses || 0,
+        draws: p.draws || 0,
+        gamesPlayed: p.gamesPlayed || 0,
+        winStreak: p.winStreak || 0,
+        profilePicture: p.profilePicture || null
+      }))
+      .sort((a, b) => b.rankedPoints - a.rankedPoints)
+      .slice(0, 100);
+    
+    saveData();
+  } catch (error) {
+    console.error('❌ Leaderboard update error:', error);
+  }
+}
+
 setInterval(saveData, 30000);
+setInterval(updateLeaderboard, 60000); // Update leaderboard every minute
 loadData();
+updateLeaderboard(); // Initial update
 
 const players = new Map();
 const queue = new Map();
@@ -88,36 +119,32 @@ const RANKS = {
   10:{name:"Efsane",xpNeeded:3200}
 };
 
-// ===== COSMETICS =====
-const COSMETICS = {
-  avatarFrames: [
-    { id: 'default', name: 'Varsayılan', cost: 0, unlocked: true },
-    { id: 'bronze', name: 'Bronz Çerçeve', cost: 500, emoji: '🥉' },
-    { id: 'silver', name: 'Gümüş Çerçeve', cost: 1000, emoji: '🥈' },
-    { id: 'gold', name: 'Altın Çerçeve', cost: 2000, emoji: '🥇' },
-    { id: 'diamond', name: 'Elmas Çerçeve', cost: 5000, emoji: '💎' },
-    { id: 'fire', name: 'Ateş Çerçevesi', cost: 3000, emoji: '🔥' },
-    { id: 'ice', name: 'Buz Çerçevesi', cost: 3000, emoji: '❄️' },
-    { id: 'star', name: 'Yıldız Çerçevesi', cost: 4000, emoji: '⭐' }
-  ],
-  profileBadges: [
-    { id: 'winner', name: 'Kazanan', cost: 0, unlocked: true, emoji: '🏆' },
-    { id: 'streak3', name: '3 Seri', cost: 300, emoji: '🔥' },
-    { id: 'streak5', name: '5 Seri', cost: 800, emoji: '🔥🔥' },
-    { id: 'streak10', name: '10 Seri', cost: 2000, emoji: '🔥🔥🔥' },
-    { id: 'master', name: 'Kelime Ustası', cost: 5000, emoji: '👑' },
-    { id: 'legend', name: 'Efsane', cost: 10000, emoji: '⚡' }
-  ],
-  profileColors: [
-    { id: 'default', name: 'Varsayılan', cost: 0, unlocked: true, color: '#00ffb3' },
-    { id: 'purple', name: 'Mor', cost: 500, color: '#9b59b6' },
-    { id: 'red', name: 'Kırmızı', cost: 500, color: '#e74c3c' },
-    { id: 'blue', name: 'Mavi', cost: 500, color: '#3498db' },
-    { id: 'orange', name: 'Turuncu', cost: 500, color: '#e67e22' },
-    { id: 'pink', name: 'Pembe', cost: 800, color: '#ff0095' },
-    { id: 'cyan', name: 'Camgöbeği', cost: 800, color: '#00e1ff' },
-    { id: 'rainbow', name: 'Gökkuşağı', cost: 3000, color: 'linear-gradient(135deg, #00ffb3, #00e1ff, #ff0095, #ffd600)' }
-  ]
+// ===== NEW: COSMETIC COSTS CONSTANT =====
+const COSMETIC_COSTS = {
+  frame: {
+    default: 0, bronze: 800, silver: 1500, gold: 3000, diamond: 6000,
+    fire: 4500, ice: 4500, lightning: 5500, cosmic: 8000, phoenix: 10000,
+    shadow: 7500, rainbow: 9000, galaxy: 12000
+  },
+  badge: {
+    winner: 0, streak3: 500, streak5: 1200, streak10: 3000,
+    speedster: 2500, perfectionist: 4000, master: 6000, veteran: 5000,
+    legend: 12000, unbeatable: 15000, genius: 8000, collector: 10000
+  },
+  color: {
+    default: 0, crimson: 800, royal: 800, toxic: 1200, purple: 1200,
+    sunset: 1500, cyberpink: 2000, electric: 2000, gold: 3000,
+    rainbow: 5000, lava: 4500, ocean: 4500, galaxy: 6000,
+    matrix: 7000, prismatic: 10000
+  },
+  background: {
+    none: 0, stars: 2000, matrix: 3500, fire: 4000, lightning: 5000,
+    cosmic: 6000, aurora: 7500, portal: 10000
+  },
+  title: {
+    none: 0, glow: 1500, wave: 2500, shake: 2500, rainbow: 4000,
+    glitch: 5000, fire: 6000, hologram: 8000
+  }
 };
 
 function getRandomWord(length){
@@ -133,11 +160,23 @@ function generateGameId(){
 function getPlayerData(playerId){
   if(!persistentPlayers[playerId]){
     persistentPlayers[playerId]={
-      playerId,totalXP:0,level:1,currentXP:0,wins:0,losses:0,draws:0,
-      gamesPlayed:0,rankedPoints:1000,highestRank:1000,winStreak:0,
-      bestWinStreak:0,lastSeen:Date.now(),
-      coins: 0, // Virtual currency for cosmetics
-      dailyPlayedToday: null, // Track daily game date
+      playerId,
+      nick: 'Oyuncu',
+      totalXP:0,
+      level:1,
+      currentXP:0,
+      wins:0,
+      losses:0,
+      draws:0,
+      gamesPlayed:0,
+      rankedPoints:1000,
+      highestRank:1000,
+      winStreak:0,
+      bestWinStreak:0,
+      lastSeen:Date.now(),
+      coins: 0,
+      dailyPlayedToday: null,
+      profilePicture: null, // NEW: Profile picture support
       cosmetics: {
         ownedFrames: ['default'],
         ownedBadges: ['winner'],
@@ -169,13 +208,14 @@ function updatePlayerLevel(playerId,xpGained,coinsGained=0){
     if(playerData.totalXP>=nextRank.xpNeeded){
       playerData.level++;
       playerData.currentXP=0;
-      playerData.coins += 500; // Bonus coins on level up
+      playerData.coins += 500;
       leveledUp=true;
     }else break;
   }
   playerData.rank=RANKS[playerData.level]?.name||'Level '+playerData.level;
   persistentPlayers[playerId]=playerData;
   saveData();
+  updateLeaderboard();
   return{playerData,leveledUp};
 }
 
@@ -207,15 +247,24 @@ function updateRankedPoints(winnerId,loserId,isDraw=false){
   
   winnerData.gamesPlayed++;
   loserData.gamesPlayed++;
+  
+  if(winnerData.rankedPoints > winnerData.highestRank){
+    winnerData.highestRank = winnerData.rankedPoints;
+  }
+  if(winnerData.winStreak > winnerData.bestWinStreak){
+    winnerData.bestWinStreak = winnerData.winStreak;
+  }
+  
   persistentPlayers[winnerId]=winnerData;
   persistentPlayers[loserId]=loserData;
   saveData();
+  updateLeaderboard();
   
   return{winnerChange,loserChange,winnerPoints:winnerData.rankedPoints,loserPoints:loserData.rankedPoints};
 }
 
 function getLeaderboard(){
-  return leaderboard.slice(0,50);
+  return leaderboard.slice(0, 50);
 }
 
 function tryMatchPlayers(){
@@ -251,15 +300,7 @@ function createMatch(player1Id,player2Id,wordLength){
   
   const startsFirst = Math.random() < 0.5 ? player1Id : player2Id;
   
-  console.log('');
-  console.log('🎮 ========== NEW GAME ==========');
-  console.log(`   Game ID: ${gameId}`);
-  console.log(`   Player 1: ${player1.nick} (${player1Id})`);
-  console.log(`   Player 2: ${player2.nick} (${player2Id})`);
-  console.log(`   Word: ${targetWord}`);
-  console.log(`   Starts First: ${startsFirst === player1Id ? player1.nick : player2.nick} (${startsFirst})`);
-  console.log('================================');
-  console.log('');
+  console.log('🎮 NEW GAME:', gameId, 'Word:', targetWord);
   
   const game={
     gameId,
@@ -286,12 +327,10 @@ function createMatch(player1Id,player2Id,wordLength){
   player1.currentGameId=gameId;
   player2.currentGameId=gameId;
   
-  // Get player cosmetics
   const player1Data = getPlayerData(player1.playerId);
   const player2Data = getPlayerData(player2.playerId);
   
   const player1Turn = startsFirst === player1Id;
-  console.log(`📤 Sending to ${player1.nick}: yourTurn=${player1Turn}`);
   io.to(player1Id).emit('game:start',{
     gameId,
     wordLength,
@@ -299,13 +338,13 @@ function createMatch(player1Id,player2Id,wordLength){
       nick:player2.nick,
       level:player2.level,
       rank:player2Data.rank,
-      cosmetics: player2Data.cosmetics
+      cosmetics: player2Data.cosmetics,
+      profilePicture: player2Data.profilePicture // NEW: Send profile picture
     },
     yourTurn: player1Turn
   });
   
   const player2Turn = startsFirst === player2Id;
-  console.log(`📤 Sending to ${player2.nick}: yourTurn=${player2Turn}`);
   io.to(player2Id).emit('game:start',{
     gameId,
     wordLength,
@@ -313,14 +352,13 @@ function createMatch(player1Id,player2Id,wordLength){
       nick:player1.nick,
       level:player1.level,
       rank:player1Data.rank,
-      cosmetics: player1Data.cosmetics
+      cosmetics: player1Data.cosmetics,
+      profilePicture: player1Data.profilePicture // NEW: Send profile picture
     },
     yourTurn: player2Turn
   });
   
-  // Start turn timer
   startTurnTimer(gameId);
-  
   broadcastQueueUpdate();
 }
 
@@ -328,14 +366,12 @@ function startTurnTimer(gameId) {
   const game = activeGames.get(gameId);
   if (!game || game.status !== 'active') return;
   
-  // Clear any existing timer
   if (game.turnTimer) {
     clearTimeout(game.turnTimer);
   }
   
   game.turnStartTime = Date.now();
   
-  // 30 second timer
   game.turnTimer = setTimeout(() => {
     handleTurnTimeout(gameId);
   }, 30000);
@@ -347,14 +383,11 @@ function handleTurnTimeout(gameId) {
   
   console.log(`⏰ Turn timeout for game ${gameId}`);
   
-  // Current player loses their turn
   const currentPlayerId = game.currentTurn;
   const otherPlayerId = currentPlayerId === game.player1Id ? game.player2Id : game.player1Id;
   
-  // Switch turn
   game.currentTurn = otherPlayerId;
   
-  // Notify both players
   io.to(currentPlayerId).emit('turn:timeout', {
     message: 'Süre doldu! Sıra rakibine geçti.'
   });
@@ -363,7 +396,6 @@ function handleTurnTimeout(gameId) {
     message: 'Rakip süre aşımı yaptı. Senin sıran!'
   });
   
-  // Update turn display
   io.to(currentPlayerId).emit('game:turn:update', {
     yourTurn: false,
     nextRow: game.currentRow
@@ -374,14 +406,20 @@ function handleTurnTimeout(gameId) {
     nextRow: game.currentRow
   });
   
-  // Start new timer
   startTurnTimer(gameId);
 }
 
 function broadcastQueueUpdate(){
   const queuePlayers=Array.from(queue.keys()).map(socketId=>{
     const player=players.get(socketId);
-    return player?{nick:player.nick,level:player.level,rank:'Yeni'}:null;
+    if (!player) return null;
+    const playerData = getPlayerData(player.playerId);
+    return {
+      nick: player.nick,
+      level: player.level,
+      rank: playerData.rank,
+      profilePicture: playerData.profilePicture // NEW: Include profile picture
+    };
   }).filter(Boolean);
   io.emit('queue:update',{players:queuePlayers});
 }
@@ -412,13 +450,17 @@ function evaluateGuess(guess,target){
 }
 
 function broadcastOnlineCount() {
-  const onlinePlayers = Array.from(players.values()).map(p => ({
-    playerId: p.playerId,
-    nick: p.nick,
-    level: p.level || 1,
-    rank: getPlayerData(p.playerId).rank,
-    inGame: p.currentGameId ? true : false
-  }));
+  const onlinePlayers = Array.from(players.values()).map(p => {
+    const playerData = getPlayerData(p.playerId);
+    return {
+      playerId: p.playerId,
+      nick: p.nick,
+      level: p.level || 1,
+      rank: playerData.rank,
+      inGame: p.currentGameId ? true : false,
+      profilePicture: playerData.profilePicture // NEW: Include profile picture
+    };
+  });
   
   io.emit('online:count', { 
     count: players.size,
@@ -426,7 +468,6 @@ function broadcastOnlineCount() {
   });
 }
 
-// Broadcast online count every 5 seconds
 setInterval(broadcastOnlineCount, 5000);
 
 // ===== SOCKET HANDLERS =====
@@ -438,19 +479,62 @@ io.on('connection',(socket)=>{
     try{
       const{playerId,nick}=data;
       const storedData=getPlayerData(playerId||socket.id);
+      
+      if (nick && nick.trim()) {
+        storedData.nick = nick.substring(0, 16);
+        persistentPlayers[playerId || socket.id] = storedData;
+        saveData();
+      }
+      
       players.set(socket.id,{
         socketId:socket.id,
         playerId:playerId||socket.id,
-        nick:(nick||'Oyuncu').substring(0,16),
+        nick: storedData.nick,
         level:storedData.level||1,
         currentGameId:null,
         connectedAt:Date.now()
       });
       socket.emit('player:registered',{playerId:playerId||socket.id,progress:storedData});
-      console.log(`✅ Registered: ${nick} (${socket.id})`);
+      console.log(`✅ Registered: ${storedData.nick}`);
       broadcastOnlineCount();
     }catch(error){
       console.error('❌ Register error:',error);
+    }
+  });
+  
+  // ===== NEW: PROFILE UPDATE HANDLER =====
+  socket.on('profile:update', (data) => {
+    try {
+      const { nick, profilePicture } = data;
+      const player = players.get(socket.id);
+      if (!player) return;
+      
+      const playerData = getPlayerData(player.playerId);
+      
+      if (nick && nick.trim()) {
+        playerData.nick = nick.substring(0, 16);
+        player.nick = playerData.nick;
+      }
+      
+      if (profilePicture !== undefined) {
+        if (profilePicture === null || profilePicture.startsWith('data:image/')) {
+          playerData.profilePicture = profilePicture;
+        }
+      }
+      
+      persistentPlayers[player.playerId] = playerData;
+      saveData();
+      updateLeaderboard();
+      
+      socket.emit('profile:updated', {
+        nick: playerData.nick,
+        profilePicture: playerData.profilePicture
+      });
+      
+      broadcastOnlineCount();
+      
+    } catch (error) {
+      console.error('❌ Profile update error:', error);
     }
   });
   
@@ -463,7 +547,7 @@ io.on('connection',(socket)=>{
       const wordLength=data.preferredLength||5;
       queue.set(socket.id,{wordLength,joinedAt:Date.now()});
       socket.emit('queue:joined',{position:queue.size});
-      console.log(`🎯 ${player.nick} joined queue (${queue.size} total)`);
+      console.log(`🎯 ${player.nick} joined queue`);
       broadcastQueueUpdate();
       setTimeout(()=>tryMatchPlayers(),100);
     }catch(error){
@@ -483,25 +567,15 @@ io.on('connection',(socket)=>{
       const game=activeGames.get(gameId);
       
       if(!game||game.status!=='active'){
-        console.log(`❌ Game not found or not active: ${gameId}`);
         socket.emit('error',{message:'Oyun bulunamadı!'});
         return;
       }
       
-      console.log('');
-      console.log('📥 ========== GUESS RECEIVED ==========');
-      console.log(`   From: ${socket.id}`);
-      console.log(`   Game current turn: ${game.currentTurn}`);
-      console.log(`   Is their turn? ${game.currentTurn === socket.id}`);
-      console.log(`   Guess: ${guess}`);
-      
       if(game.currentTurn !== socket.id){
-        console.log(`❌ NOT YOUR TURN!`);
         socket.emit('error',{message:'Sıran değil!'});
         return;
       }
       
-      // Clear turn timer
       if (game.turnTimer) {
         clearTimeout(game.turnTimer);
         game.turnTimer = null;
@@ -526,14 +600,9 @@ io.on('connection',(socket)=>{
       };
       game.sharedBoard.push(boardEntry);
       
-      console.log(`   Result: ${result.join(',')}`);
-      console.log(`   Won: ${won}`);
-      console.log(`   Row: ${game.currentRow}`);
-      
       if(won){
         game.winner=socket.id;
         game.status='finished';
-        console.log(`🏆 ${socket.id} WON!`);
         endGame(gameId,socket.id);
         return;
       }
@@ -541,18 +610,12 @@ io.on('connection',(socket)=>{
       game.currentRow++;
       
       if(game.currentRow>=game.maxGuesses){
-        console.log(`🤝 DRAW - Max guesses reached`);
         endGame(gameId,null);
         return;
       }
       
       const nextTurn = game.currentTurn === game.player1Id ? game.player2Id : game.player1Id;
       game.currentTurn = nextTurn;
-      
-      console.log(`   Next turn: ${nextTurn}`);
-      console.log(`   Next row: ${game.currentRow}`);
-      console.log('=====================================');
-      console.log('');
       
       io.to(socket.id).emit('game:board:update',{
         rowIndex:boardEntry.rowIndex,
@@ -571,7 +634,6 @@ io.on('connection',(socket)=>{
         yourTurn:true
       });
       
-      // Start new turn timer
       startTurnTimer(gameId);
       
     }catch(error){
@@ -599,12 +661,10 @@ io.on('connection',(socket)=>{
       
       game.chatMessages.push(chatMessage);
       
-      // Keep only last 50 messages
       if (game.chatMessages.length > 50) {
         game.chatMessages = game.chatMessages.slice(-50);
       }
       
-      // Broadcast to both players
       io.to(game.player1Id).emit('chat:message', chatMessage);
       io.to(game.player2Id).emit('chat:message', chatMessage);
       
@@ -613,6 +673,7 @@ io.on('connection',(socket)=>{
     }
   });
   
+  // ===== FIXED: COSMETIC BUY HANDLER =====
   socket.on('cosmetic:buy', (data) => {
     try {
       const { itemType, itemId } = data;
@@ -621,67 +682,58 @@ io.on('connection',(socket)=>{
       
       const playerData = getPlayerData(player.playerId);
       
-      // Simple cost lookup - in real app, fetch from database
-      const costs = {
-        frame: { default:0, bronze:800, silver:1500, gold:3000, diamond:6000, fire:4500, ice:4500, lightning:5500, cosmic:8000, phoenix:10000, shadow:7500, rainbow:9000, galaxy:12000 },
-        badge: { winner:0, streak3:500, streak5:1200, streak10:3000, speedster:2500, perfectionist:4000, master:6000, veteran:5000, legend:12000, unbeatable:15000, genius:8000, collector:10000 },
-        color: { default:0, crimson:800, royal:800, toxic:1200, purple:1200, sunset:1500, cyberpink:2000, electric:2000, gold:3000, rainbow:5000, lava:4500, ocean:4500, galaxy:6000, matrix:7000, prismatic:10000 },
-        background: { none:0, stars:2000, matrix:3500, fire:4000, lightning:5000, cosmic:6000, aurora:7500, portal:10000 },
-        title: { none:0, glow:1500, wave:2500, shake:2500, rainbow:4000, glitch:5000, fire:6000, hologram:8000 }
-      };
-      
-      let ownedArray = null;
-      let cost = 0;
-      
-      if (itemType === 'frame') {
-        ownedArray = playerData.cosmetics.ownedFrames;
-        cost = costs.frame[itemId] || 999999;
-      } else if (itemType === 'badge') {
-        ownedArray = playerData.cosmetics.ownedBadges;
-        cost = costs.badge[itemId] || 999999;
-      } else if (itemType === 'color') {
-        ownedArray = playerData.cosmetics.ownedColors;
-        cost = costs.color[itemId] || 999999;
-      } else if (itemType === 'background') {
-        ownedArray = playerData.cosmetics.ownedBackgrounds || ['none'];
-        if (!playerData.cosmetics.ownedBackgrounds) playerData.cosmetics.ownedBackgrounds = ['none'];
-        cost = costs.background[itemId] || 999999;
-      } else if (itemType === 'title') {
-        ownedArray = playerData.cosmetics.ownedTitles || ['none'];
-        if (!playerData.cosmetics.ownedTitles) playerData.cosmetics.ownedTitles = ['none'];
-        cost = costs.title[itemId] || 999999;
-      }
-      
-      if (!ownedArray) {
-        socket.emit('error', { message: 'Geçersiz kozmetik türü!' });
+      // Get cost from constant
+      const cost = COSMETIC_COSTS[itemType]?.[itemId];
+      if (cost === undefined) {
+        socket.emit('error', { message: 'Geçersiz kozmetik!' });
         return;
       }
       
-      if (ownedArray.includes(itemId)) {
+      // Determine owned array key
+      let ownedKey;
+      if (itemType === 'frame') ownedKey = 'ownedFrames';
+      else if (itemType === 'badge') ownedKey = 'ownedBadges';
+      else if (itemType === 'color') ownedKey = 'ownedColors';
+      else if (itemType === 'background') ownedKey = 'ownedBackgrounds';
+      else if (itemType === 'title') ownedKey = 'ownedTitles';
+      
+      // Initialize if needed
+      if (!playerData.cosmetics[ownedKey]) {
+        if (itemType === 'background' || itemType === 'title') {
+          playerData.cosmetics[ownedKey] = ['none'];
+        } else {
+          playerData.cosmetics[ownedKey] = ['default'];
+        }
+      }
+      
+      // Check ownership
+      if (playerData.cosmetics[ownedKey].includes(itemId)) {
         socket.emit('error', { message: 'Zaten sahipsin!' });
         return;
       }
       
+      // Check coins
       if (playerData.coins < cost) {
         socket.emit('error', { message: 'Yeterli coinin yok!' });
         return;
       }
       
+      // Purchase
       playerData.coins -= cost;
-      ownedArray.push(itemId);
+      playerData.cosmetics[ownedKey].push(itemId);
       
       persistentPlayers[player.playerId] = playerData;
       saveData();
       
       socket.emit('cosmetic:purchased', {
-        itemType,
-        itemId,
+        itemType, itemId,
         newCoins: playerData.coins,
         cosmetics: playerData.cosmetics
       });
       
     } catch (error) {
       console.error('❌ Cosmetic buy error:', error);
+      socket.emit('error', { message: 'Satın alma hatası!' });
     }
   });
   
@@ -693,36 +745,51 @@ io.on('connection',(socket)=>{
       
       const playerData = getPlayerData(player.playerId);
       
+      // Determine keys
+      let ownedKey, equippedKey;
       if (itemType === 'frame') {
-        if (!playerData.cosmetics.ownedFrames.includes(itemId)) return;
-        playerData.cosmetics.equippedFrame = itemId;
+        ownedKey = 'ownedFrames';
+        equippedKey = 'equippedFrame';
       } else if (itemType === 'badge') {
-        if (!playerData.cosmetics.ownedBadges.includes(itemId)) return;
-        playerData.cosmetics.equippedBadge = itemId;
+        ownedKey = 'ownedBadges';
+        equippedKey = 'equippedBadge';
       } else if (itemType === 'color') {
-        if (!playerData.cosmetics.ownedColors.includes(itemId)) return;
-        playerData.cosmetics.equippedColor = itemId;
+        ownedKey = 'ownedColors';
+        equippedKey = 'equippedColor';
       } else if (itemType === 'background') {
-        if (!playerData.cosmetics.ownedBackgrounds) playerData.cosmetics.ownedBackgrounds = ['none'];
-        if (!playerData.cosmetics.ownedBackgrounds.includes(itemId)) return;
-        playerData.cosmetics.equippedBackground = itemId;
+        ownedKey = 'ownedBackgrounds';
+        equippedKey = 'equippedBackground';
+        if (!playerData.cosmetics[ownedKey]) {
+          playerData.cosmetics[ownedKey] = ['none'];
+        }
       } else if (itemType === 'title') {
-        if (!playerData.cosmetics.ownedTitles) playerData.cosmetics.ownedTitles = ['none'];
-        if (!playerData.cosmetics.ownedTitles.includes(itemId)) return;
-        playerData.cosmetics.equippedTitle = itemId;
+        ownedKey = 'ownedTitles';
+        equippedKey = 'equippedTitle';
+        if (!playerData.cosmetics[ownedKey]) {
+          playerData.cosmetics[ownedKey] = ['none'];
+        }
       }
+      
+      // Check ownership
+      if (!playerData.cosmetics[ownedKey].includes(itemId)) {
+        socket.emit('error', { message: 'Bu kozmetiğe sahip değilsin!' });
+        return;
+      }
+      
+      // Equip
+      playerData.cosmetics[equippedKey] = itemId;
       
       persistentPlayers[player.playerId] = playerData;
       saveData();
       
       socket.emit('cosmetic:equipped', {
-        itemType,
-        itemId,
+        itemType, itemId,
         cosmetics: playerData.cosmetics
       });
       
     } catch (error) {
       console.error('❌ Cosmetic equip error:', error);
+      socket.emit('error', { message: 'Donatma hatası!' });
     }
   });
   
@@ -732,28 +799,22 @@ io.on('connection',(socket)=>{
       const player = players.get(socket.id);
       if (!player) return;
       
-      // Define case rewards (same as frontend)
       const caseRewards = [
-        // Coins
         { type: 'coins', amount: 100, rarity: 'common', weight: 15, name: '100 Coin' },
         { type: 'coins', amount: 250, rarity: 'uncommon', weight: 10, name: '250 Coin' },
         { type: 'coins', amount: 500, rarity: 'rare', weight: 5, name: '500 Coin' },
-        // XP
         { type: 'xp', amount: 50, rarity: 'common', weight: 10, name: '50 XP' },
         { type: 'xp', amount: 100, rarity: 'uncommon', weight: 7, name: '100 XP' },
         { type: 'xp', amount: 250, rarity: 'rare', weight: 3, name: '250 XP' },
-        // Frames
         { type: 'frame', id: 'bronze', rarity: 'common', weight: 12, name: 'Bronz Şövalye' },
         { type: 'frame', id: 'silver', rarity: 'uncommon', weight: 8, name: 'Gümüş Lejyon' },
         { type: 'frame', id: 'gold', rarity: 'rare', weight: 5, name: 'Altın İmparator' },
         { type: 'frame', id: 'fire', rarity: 'rare', weight: 4, name: 'Ateş Efendisi' },
         { type: 'frame', id: 'ice', rarity: 'rare', weight: 4, name: 'Buz Kralı' },
         { type: 'frame', id: 'diamond', rarity: 'epic', weight: 2, name: 'Elmas Titan' },
-        // Badges
         { type: 'badge', id: 'streak3', rarity: 'common', weight: 10, name: 'Ateş Başlangıcı' },
         { type: 'badge', id: 'streak5', rarity: 'uncommon', weight: 6, name: 'Alev Yüreği' },
         { type: 'badge', id: 'speedster', rarity: 'rare', weight: 3, name: 'Hız Şeytanı' },
-        // Colors
         { type: 'color', id: 'crimson', rarity: 'common', weight: 10, name: 'Kızıl Öfke' },
         { type: 'color', id: 'royal', rarity: 'common', weight: 10, name: 'Kraliyet Mavisi' },
         { type: 'color', id: 'toxic', rarity: 'uncommon', weight: 7, name: 'Zehir Yeşili' },
@@ -761,7 +822,6 @@ io.on('connection',(socket)=>{
         { type: 'color', id: 'gold', rarity: 'rare', weight: 3, name: 'Altın Işıltısı' }
       ];
       
-      // Weighted random selection
       const totalWeight = caseRewards.reduce((sum, r) => sum + r.weight, 0);
       let random = Math.random() * totalWeight;
       
@@ -774,9 +834,6 @@ io.on('connection',(socket)=>{
         }
       }
       
-      console.log(`🎰 ${player.nick} opened case, got:`, selectedReward.name);
-      
-      // Send reward to client
       socket.emit('case:reward', {
         reward: selectedReward
       });
@@ -842,7 +899,6 @@ io.on('connection',(socket)=>{
     if(player&&player.currentGameId){
       const game=activeGames.get(player.currentGameId);
       if(game&&game.status==='active'){
-        // Clear timer
         if (game.turnTimer) {
           clearTimeout(game.turnTimer);
         }
@@ -864,19 +920,10 @@ function endGame(gameId,winnerId=null,disconnected=false){
     const game=activeGames.get(gameId);
     if(!game)return;
     
-    // Clear timer
     if (game.turnTimer) {
       clearTimeout(game.turnTimer);
       game.turnTimer = null;
     }
-    
-    console.log('');
-    console.log('🏁 ========== GAME END ==========');
-    console.log(`   Game ID: ${gameId}`);
-    console.log(`   Winner: ${winnerId || 'DRAW'}`);
-    console.log(`   Disconnected: ${disconnected}`);
-    console.log('================================');
-    console.log('');
     
     const isDraw=!winnerId;
     const player1Id = game.player1Id;
@@ -989,7 +1036,8 @@ app.get('/stats',(req,res)=>{
   res.json({
     totalPlayers:players.size,
     queueSize:queue.size,
-    activeGames:activeGames.size
+    activeGames:activeGames.size,
+    leaderboardSize:leaderboard.length
   });
 });
 
@@ -999,16 +1047,15 @@ server.listen(PORT,()=>{
   console.log(`
 ╔═══════════════════════════════════════╗
 ║  🎮 ROODLE BY RELAQUENT - SERVER 🎮  ║
-║   v2.0 - ENHANCED EDITION             ║
+║   v2.1 - ALL FIXES APPLIED           ║
 ╠═══════════════════════════════════════╣
 ║  Port: ${PORT.toString().padEnd(30)}║
-║  Features: ✅ Chat, Timer, Cosmetics ║
-║  Daily Limit: ✅ FIXED               ║
-║  Ranks: ✅ 10 Levels                 ║
+║  ✅ Leaderboard Fixed                ║
+║  ✅ Cosmetics Fixed                  ║
+║  ✅ Profile Pictures Added           ║
 ╚═══════════════════════════════════════╝
   `);
   console.log(`📊 Endpoints: /health /stats`);
-  console.log('');
 });
 
 process.on('SIGTERM',()=>{
